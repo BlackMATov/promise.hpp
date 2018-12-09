@@ -25,32 +25,42 @@ namespace promise_hpp
     class promise;
 
     //
-    // make_promise
+    // is_promise
     //
 
-    template < typename R, typename F >
-    promise<R> make_promise(F&& f) {
-        promise<R> result;
+    namespace impl
+    {
+        template < typename T >
+        struct is_promise_impl
+        : std::false_type {};
 
-        auto resolver = std::bind([](promise<R>& p, auto&& v){
-            p.resolve(std::forward<decltype(v)>(v));
-        }, result, std::placeholders::_1);
-
-        auto rejector = std::bind([](promise<R>& p, auto&& e){
-            p.reject(std::forward<decltype(e)>(e));
-        }, result, std::placeholders::_1);
-
-        try {
-            invoke_hpp::invoke(
-                std::forward<F>(f),
-                std::move(resolver),
-                std::move(rejector));
-        } catch (...) {
-            result.reject(std::current_exception());
-        }
-
-        return result;
+        template < typename R >
+        struct is_promise_impl<promise<R>>
+        : std::true_type {};
     }
+
+    template < typename T >
+    struct is_promise
+    : impl::is_promise_impl<std::remove_cv_t<T>> {};
+
+    //
+    // is_promise_r
+    //
+
+    namespace impl
+    {
+        template < typename R, typename T >
+        struct is_promise_r_impl
+        : std::false_type {};
+
+        template < typename R, typename PR >
+        struct is_promise_r_impl<R, promise<PR>>
+        : std::is_convertible<PR, R> {};
+    }
+
+    template < typename R, typename T >
+    struct is_promise_r
+    : impl::is_promise_r_impl<R, std::remove_cv_t<T>> {};
 
     //
     // promise<T>
@@ -59,6 +69,8 @@ namespace promise_hpp
     template < typename T >
     class promise final {
     public:
+        using value_type = T;
+
         enum class status : std::uint8_t {
             pending,
             resolved,
@@ -298,6 +310,8 @@ namespace promise_hpp
     template <>
     class promise<void> final {
     public:
+        using value_type = void;
+
         enum class status : std::uint8_t {
             pending,
             resolved,
@@ -487,4 +501,59 @@ namespace promise_hpp
             std::vector<handler> handlers_;
         };
     };
+
+    //
+    // make_promise
+    //
+
+    template < typename R, typename F >
+    promise<R> make_promise(F&& f) {
+        promise<R> result;
+
+        auto resolver = std::bind([](promise<R>& p, auto&& v){
+            p.resolve(std::forward<decltype(v)>(v));
+        }, result, std::placeholders::_1);
+
+        auto rejector = std::bind([](promise<R>& p, auto&& e){
+            p.reject(std::forward<decltype(e)>(e));
+        }, result, std::placeholders::_1);
+
+        try {
+            invoke_hpp::invoke(
+                std::forward<F>(f),
+                std::move(resolver),
+                std::move(rejector));
+        } catch (...) {
+            result.reject(std::current_exception());
+        }
+
+        return result;
+    }
+
+    inline promise<void> make_resolved_promise() {
+        promise<void> result;
+        result.resolve();
+        return result;
+    }
+
+    template < typename R >
+    promise<std::decay_t<R>> make_resolved_promise(R&& v) {
+        promise<std::decay_t<R>> result;
+        result.resolve(std::forward<R>(v));
+        return result;
+    }
+
+    template < typename E >
+    promise<void> make_rejected_promise(E&& e) {
+        promise<void> result;
+        result.reject(std::forward<E>(e));
+        return result;
+    }
+
+    template < typename R, typename E >
+    promise<R> make_rejected_promise(E&& e) {
+        promise<R> result;
+        result.reject(std::forward<E>(e));
+        return result;
+    }
 }

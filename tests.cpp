@@ -6,6 +6,9 @@ namespace pr = promise_hpp;
 
 namespace
 {
+    struct obj_t {
+    };
+
     bool check_hello_fail_exception(std::exception_ptr e) {
         try {
             std::rethrow_exception(e);
@@ -14,6 +17,79 @@ namespace
         } catch (...) {
             return false;
         }
+    }
+}
+
+TEST_CASE("is_promise") {
+    SECTION("positive") {
+        static_assert(
+            pr::is_promise<pr::promise<void>>::value,
+            "unit test fail");
+        static_assert(
+            pr::is_promise<const pr::promise<void>>::value,
+            "unit test fail");
+        static_assert(
+            pr::is_promise<const volatile pr::promise<void>>::value,
+            "unit test fail");
+
+        static_assert(
+            pr::is_promise<pr::promise<int>>::value,
+            "unit test fail");
+        static_assert(
+            pr::is_promise<const pr::promise<int>>::value,
+            "unit test fail");
+        static_assert(
+            pr::is_promise<const volatile pr::promise<int>>::value,
+            "unit test fail");
+    }
+    SECTION("negative") {
+        static_assert(
+            !pr::is_promise<pr::promise<void>&>::value,
+            "unit test fail");
+        static_assert(
+            !pr::is_promise<const pr::promise<void>*>::value,
+            "unit test fail");
+        static_assert(
+            !pr::is_promise<const volatile pr::promise<int>&>::value,
+            "unit test fail");
+
+        static_assert(
+            !pr::is_promise<int>::value,
+            "unit test fail");
+        static_assert(
+            !pr::is_promise<void>::value,
+            "unit test fail");
+        static_assert(
+            !pr::is_promise<const volatile int>::value,
+            "unit test fail");
+    }
+}
+
+TEST_CASE("is_promise_r") {
+    SECTION("positive") {
+        static_assert(
+            pr::is_promise_r<void, pr::promise<void>>::value,
+            "unit test fail");
+        static_assert(
+            pr::is_promise_r<int, const pr::promise<int>>::value,
+            "unit test fail");
+        static_assert(
+            pr::is_promise_r<long, const pr::promise<int>>::value,
+            "unit test fail");
+    }
+    SECTION("negative") {
+        static_assert(
+            !pr::is_promise_r<void, pr::promise<int>>::value,
+            "unit test fail");
+        static_assert(
+            !pr::is_promise_r<void, const pr::promise<int>>::value,
+            "unit test fail");
+        static_assert(
+            !pr::is_promise_r<int, pr::promise<obj_t>>::value,
+            "unit test fail");
+        static_assert(
+            !pr::is_promise_r<long, int>::value,
+            "unit test fail");
     }
 }
 
@@ -186,6 +262,42 @@ TEST_CASE("promise") {
                 throw std::logic_error("hello fail");
             });
             p.fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+            REQUIRE(call_fail_with_logic_error);
+        }
+    }
+    SECTION("make_resolved_promise") {
+        {
+            bool call_check = false;
+            pr::make_resolved_promise()
+            .then([&call_check]{
+                call_check = true;
+            });
+            REQUIRE(call_check);
+        }
+        {
+            int check_42_int = 0;
+            pr::make_resolved_promise(42)
+            .then([&check_42_int](int value){
+                check_42_int = value;
+            });
+            REQUIRE(check_42_int == 42);
+        }
+    }
+    SECTION("make_rejected_promise") {
+        {
+            bool call_fail_with_logic_error = false;
+            pr::make_rejected_promise<int>(std::logic_error("hello fail"))
+            .fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+            REQUIRE(call_fail_with_logic_error);
+        }
+        {
+            bool call_fail_with_logic_error = 0;
+            pr::make_rejected_promise(std::logic_error("hello fail"))
+            .fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(call_fail_with_logic_error);
