@@ -25,31 +25,92 @@ namespace promise_hpp
     class promise;
 
     //
-    // make_promise
+    // is_promise
     //
 
-    template < typename R, typename F >
-    promise<R> make_promise(F&& f) {
-        promise<R> result;
+    namespace impl
+    {
+        template < typename T >
+        struct is_promise_impl
+        : std::false_type {};
 
-        auto resolver = std::bind([](promise<R>& p, auto&& v){
-            p.resolve(std::forward<decltype(v)>(v));
-        }, result, std::placeholders::_1);
+        template < typename R >
+        struct is_promise_impl<promise<R>>
+        : std::true_type {};
+    }
 
-        auto rejector = std::bind([](promise<R>& p, auto&& e){
-            p.reject(std::forward<decltype(e)>(e));
-        }, result, std::placeholders::_1);
+    template < typename T >
+    struct is_promise
+    : impl::is_promise_impl<std::remove_cv_t<T>> {};
 
-        try {
-            invoke_hpp::invoke(
-                std::forward<F>(f),
-                std::move(resolver),
-                std::move(rejector));
-        } catch (...) {
-            result.reject(std::current_exception());
-        }
+    //
+    // is_promise_r
+    //
 
-        return result;
+    namespace impl
+    {
+        template < typename R, typename T >
+        struct is_promise_r_impl
+        : std::false_type {};
+
+        template < typename R, typename PR >
+        struct is_promise_r_impl<R, promise<PR>>
+        : std::is_convertible<PR, R> {};
+    }
+
+    template < typename R, typename T >
+    struct is_promise_r
+    : impl::is_promise_r_impl<R, std::remove_cv_t<T>> {};
+
+    //
+    // detail
+    //
+
+    namespace detail
+    {
+        class noncopyable {
+        public:
+            noncopyable(const noncopyable&) = delete;
+            noncopyable& operator=(const noncopyable&) = delete;
+        protected:
+            noncopyable() = default;
+            ~noncopyable() = default;
+        };
+
+        template < typename T >
+        class storage final : private noncopyable {
+        public:
+            storage() = default;
+
+            ~storage() noexcept(std::is_nothrow_destructible<T>::value) {
+                if ( initialized_ ) {
+                    ptr_()->~T();
+                }
+            }
+
+            template < typename U >
+            void set(U&& value) noexcept(std::is_nothrow_constructible<T,U&&>::value) {
+                assert(!initialized_);
+                ::new(ptr_()) T(std::forward<U>(value));
+                initialized_ = true;
+            }
+
+            const T& value() const noexcept {
+                assert(initialized_);
+                return *ptr_();
+            }
+        private:
+            T* ptr_() noexcept {
+                return reinterpret_cast<T*>(&data_);
+            }
+
+            const T* ptr_() const noexcept {
+                return reinterpret_cast<const T*>(&data_);
+            }
+        private:
+            std::aligned_storage_t<sizeof(T), alignof(T)> data_;
+            bool initialized_ = false;
+        };
     }
 
     //
@@ -59,6 +120,8 @@ namespace promise_hpp
     template < typename T >
     class promise final {
     public:
+        using value_type = T;
+
         enum class status : std::uint8_t {
             pending,
             resolved,
@@ -70,24 +133,69 @@ namespace promise_hpp
 
         template < typename ResolveF
                  , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF,T> >
-        promise<ResolveFR> then(ResolveF&& on_resolve) {
+        std::enable_if_t<
+            is_promise<ResolveFR>::value && !std::is_void<typename ResolveFR::value_type>::value,
+            promise<typename ResolveFR::value_type>>
+        then(ResolveF&& on_resolve) {
+            promise<typename ResolveFR::value_type> next;
+
+            then([
+                n = next,
+                f = std::forward<ResolveF>(on_resolve)
+            ](const T& v) mutable {
+                auto np = invoke_hpp::invoke(
+                    std::forward<decltype(f)>(f),
+                    v);
+                np.then([n = n](const typename ResolveFR::value_type& nv) mutable {
+                    n.resolve(nv);
+                }).fail([n = n](std::exception_ptr e) mutable {
+                    n.reject(e);
+                });
+            }).fail([n = next](std::exception_ptr e) mutable {
+                n.reject(e);
+            });
+
+            return next;
+        }
+
+        template < typename ResolveF
+                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF,T> >
+        std::enable_if_t<
+            is_promise<ResolveFR>::value && std::is_void<typename ResolveFR::value_type>::value,
+            promise<typename ResolveFR::value_type>>
+        then(ResolveF&& on_resolve) {
+            promise<typename ResolveFR::value_type> next;
+
+            then([
+                n = next,
+                f = std::forward<ResolveF>(on_resolve)
+            ](const T& v) mutable {
+                auto np = invoke_hpp::invoke(
+                    std::forward<decltype(f)>(f),
+                    v);
+                np.then([n = n]() mutable {
+                    n.resolve();
+                }).fail([n = n](std::exception_ptr e) mutable {
+                    n.reject(e);
+                });
+            }).fail([n = next](std::exception_ptr e) mutable {
+                n.reject(e);
+            });
+
+            return next;
+        }
+
+        template < typename ResolveF
+                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF,T> >
+        std::enable_if_t<
+            !is_promise<ResolveFR>::value,
+            promise<ResolveFR>>
+        then(ResolveF&& on_resolve) {
             promise<ResolveFR> next;
             state_->attach(
                 next,
                 std::forward<ResolveF>(on_resolve),
                 [](std::exception_ptr){});
-            return next;
-        }
-
-        template < typename ResolveF
-                 , typename RejectF
-                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF,T> >
-        promise<ResolveFR> then(ResolveF&& on_resolve, RejectF&& on_reject) {
-            promise<ResolveFR> next;
-            state_->attach(
-                next,
-                std::forward<ResolveF>(on_resolve),
-                std::forward<RejectF>(on_reject));
             return next;
         }
 
@@ -121,49 +229,9 @@ namespace promise_hpp
         class state;
         std::shared_ptr<state> state_;
     private:
-        class storage final {
-        public:
-            storage() = default;
-
-            storage(const storage&) = delete;
-            storage& operator=(const storage&) = delete;
-
-            ~storage() noexcept(std::is_nothrow_destructible<T>::value) {
-                if ( initialized_ ) {
-                    ptr_()->~T();
-                }
-            }
-
-            template < typename U >
-            void set(U&& value) {
-                assert(!initialized_);
-                ::new(ptr_()) T(std::forward<U>(value));
-                initialized_ = true;
-            }
-
-            const T& value() const noexcept {
-                assert(initialized_);
-                return *ptr_();
-            }
-        private:
-            T* ptr_() noexcept {
-                return reinterpret_cast<T*>(&data_);
-            }
-
-            const T* ptr_() const noexcept {
-                return reinterpret_cast<const T*>(&data_);
-            }
-        private:
-            std::aligned_storage_t<sizeof(T), alignof(T)> data_;
-            bool initialized_ = false;
-        };
-
-        class state final {
+        class state final : private detail::noncopyable {
         public:
             state() = default;
-
-            state(const state&) = delete;
-            state& operator=(const state&) = delete;
 
             template < typename U >
             void resolve(U&& value) {
@@ -188,30 +256,45 @@ namespace promise_hpp
 
             template < typename U, typename ResolveF, typename RejectF >
             std::enable_if_t<!std::is_void<U>::value, void>
-            attach(promise<U>& other, ResolveF&& resolve, RejectF&& reject) {
-                auto resolve_h = std::bind([](promise<U>& p, const ResolveF& f, const T& v){
+            attach(promise<U>& next, ResolveF&& resolve, RejectF&& reject) {
+                auto resolve_h = [
+                    n = next,
+                    f = std::forward<ResolveF>(resolve)
+                ](const T& v) mutable {
                     try {
-                        p.resolve(invoke_hpp::invoke(f, v));
+                        auto r = invoke_hpp::invoke(
+                            std::forward<decltype(f)>(f),
+                            v);
+                        n.resolve(std::move(r));
                     } catch (...) {
-                        p.reject(std::current_exception());
+                        n.reject(std::current_exception());
                     }
-                }, other, std::forward<ResolveF>(resolve), std::placeholders::_1);
+                };
 
-                auto reject_h = std::bind([](promise<U>& p, const RejectF& f, std::exception_ptr e){
+                auto reject_h = [
+                    n = next,
+                    f = std::forward<RejectF>(reject)
+                ](std::exception_ptr e) mutable {
                     try {
-                        invoke_hpp::invoke(f, e);
-                        p.reject(e);
+                        invoke_hpp::invoke(
+                            std::forward<decltype(f)>(f),
+                            e);
+                        n.reject(e);
                     } catch (...) {
-                        p.reject(std::current_exception());
+                        n.reject(std::current_exception());
                     }
-                }, other, std::forward<RejectF>(reject), std::placeholders::_1);
+                };
 
                 std::lock_guard<std::mutex> guard(mutex_);
 
                 if ( status_ == status::resolved ) {
-                    resolve_h(storage_.value());
+                    invoke_hpp::invoke(
+                        std::move(resolve_h),
+                        storage_.value());
                 } else if ( status_ == status::rejected ) {
-                    reject_h(exception_);
+                    invoke_hpp::invoke(
+                        std::move(reject_h),
+                        exception_);
                 } else {
                     handlers_.emplace_back(
                         std::move(resolve_h),
@@ -221,31 +304,45 @@ namespace promise_hpp
 
             template < typename U, typename ResolveF, typename RejectF >
             std::enable_if_t<std::is_void<U>::value, void>
-            attach(promise<U>& other, ResolveF&& resolve, RejectF&& reject) {
-                auto resolve_h = std::bind([](promise<U>& p, const ResolveF& f, const T& v){
+            attach(promise<U>& next, ResolveF&& resolve, RejectF&& reject) {
+                auto resolve_h = [
+                    n = next,
+                    f = std::forward<ResolveF>(resolve)
+                ](const T& v) mutable {
                     try {
-                        invoke_hpp::invoke(f, v);
-                        p.resolve();
+                        invoke_hpp::invoke(
+                            std::forward<decltype(f)>(f),
+                            v);
+                        n.resolve();
                     } catch (...) {
-                        p.reject(std::current_exception());
+                        n.reject(std::current_exception());
                     }
-                }, other, std::forward<ResolveF>(resolve), std::placeholders::_1);
+                };
 
-                auto reject_h = std::bind([](promise<U>& p, const RejectF& f, std::exception_ptr e){
+                auto reject_h = [
+                    n = next,
+                    f = std::forward<RejectF>(reject)
+                ](std::exception_ptr e) mutable {
                     try {
-                        invoke_hpp::invoke(f, e);
-                        p.reject(e);
+                        invoke_hpp::invoke(
+                            std::forward<decltype(f)>(f),
+                            e);
+                        n.reject(e);
                     } catch (...) {
-                        p.reject(std::current_exception());
+                        n.reject(std::current_exception());
                     }
-                }, other, std::forward<RejectF>(reject), std::placeholders::_1);
+                };
 
                 std::lock_guard<std::mutex> guard(mutex_);
 
                 if ( status_ == status::resolved ) {
-                    resolve_h(storage_.value());
+                    invoke_hpp::invoke(
+                        std::move(resolve_h),
+                        storage_.value());
                 } else if ( status_ == status::rejected ) {
-                    reject_h(exception_);
+                    invoke_hpp::invoke(
+                        std::move(reject_h),
+                        exception_);
                 } else {
                     handlers_.emplace_back(
                         std::move(resolve_h),
@@ -268,7 +365,7 @@ namespace promise_hpp
                 handlers_.clear();
             }
         private:
-            storage storage_;
+            detail::storage<T> storage_;
             status status_ = status::pending;
             std::exception_ptr exception_ = nullptr;
 
@@ -298,6 +395,8 @@ namespace promise_hpp
     template <>
     class promise<void> final {
     public:
+        using value_type = void;
+
         enum class status : std::uint8_t {
             pending,
             resolved,
@@ -309,24 +408,67 @@ namespace promise_hpp
 
         template < typename ResolveF
                  , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF> >
-        promise<ResolveFR> then(ResolveF&& on_resolve) {
+        std::enable_if_t<
+            is_promise<ResolveFR>::value && !std::is_void<typename ResolveFR::value_type>::value,
+            promise<typename ResolveFR::value_type>>
+        then(ResolveF&& on_resolve) {
+            promise<typename ResolveFR::value_type> next;
+
+            then([
+                n = next,
+                f = std::forward<ResolveF>(on_resolve)
+            ]() mutable {
+                auto np = invoke_hpp::invoke(
+                    std::forward<decltype(f)>(f));
+                np.then([n = n](const typename ResolveFR::value_type& nv) mutable {
+                    n.resolve(nv);
+                }).fail([n = n](std::exception_ptr e) mutable {
+                    n.reject(e);
+                });
+            }).fail([n = next](std::exception_ptr e) mutable {
+                n.reject(e);
+            });
+
+            return next;
+        }
+
+        template < typename ResolveF
+                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF> >
+        std::enable_if_t<
+            is_promise<ResolveFR>::value && std::is_void<typename ResolveFR::value_type>::value,
+            promise<typename ResolveFR::value_type>>
+        then(ResolveF&& on_resolve) {
+            promise<typename ResolveFR::value_type> next;
+
+            then([
+                n = next,
+                f = std::forward<ResolveF>(on_resolve)
+            ]() mutable {
+                auto np = invoke_hpp::invoke(
+                    std::forward<decltype(f)>(f));
+                np.then([n = n]() mutable {
+                    n.resolve();
+                }).fail([n = n](std::exception_ptr e) mutable {
+                    n.reject(e);
+                });
+            }).fail([n = next](std::exception_ptr e) mutable {
+                n.reject(e);
+            });
+
+            return next;
+        }
+
+        template < typename ResolveF
+                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF> >
+        std::enable_if_t<
+            !is_promise<ResolveFR>::value,
+            promise<ResolveFR>>
+        then(ResolveF&& on_resolve) {
             promise<ResolveFR> next;
             state_->attach(
                 next,
                 std::forward<ResolveF>(on_resolve),
                 [](std::exception_ptr){});
-            return next;
-        }
-
-        template < typename ResolveF
-                 , typename RejectF
-                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF> >
-        promise<ResolveFR> then(ResolveF&& on_resolve, RejectF&& on_reject) {
-            promise<ResolveFR> next;
-            state_->attach(
-                next,
-                std::forward<ResolveF>(on_resolve),
-                std::forward<RejectF>(on_reject));
             return next;
         }
 
@@ -359,12 +501,9 @@ namespace promise_hpp
         class state;
         std::shared_ptr<state> state_;
     private:
-        class state final {
+        class state final : private detail::noncopyable {
         public:
             state() = default;
-
-            state(const state&) = delete;
-            state& operator=(const state&) = delete;
 
             void resolve() {
                 std::lock_guard<std::mutex> guard(mutex_);
@@ -387,30 +526,43 @@ namespace promise_hpp
 
             template < typename U, typename ResolveF, typename RejectF >
             std::enable_if_t<!std::is_void<U>::value, void>
-            attach(promise<U>& other, ResolveF&& resolve, RejectF&& reject) {
-                auto resolve_h = std::bind([](promise<U>& p, const ResolveF& f){
+            attach(promise<U>& next, ResolveF&& resolve, RejectF&& reject) {
+                auto resolve_h = [
+                    n = next,
+                    f = std::forward<ResolveF>(resolve)
+                ]() mutable {
                     try {
-                        p.resolve(invoke_hpp::invoke(f));
+                        auto r = invoke_hpp::invoke(
+                            std::forward<decltype(f)>(f));
+                        n.resolve(std::move(r));
                     } catch (...) {
-                        p.reject(std::current_exception());
+                        n.reject(std::current_exception());
                     }
-                }, other, std::forward<ResolveF>(resolve));
+                };
 
-                auto reject_h = std::bind([](promise<U>& p, const RejectF& f, std::exception_ptr e){
+                auto reject_h = [
+                    n = next,
+                    f = std::forward<RejectF>(reject)
+                ](std::exception_ptr e) mutable {
                     try {
-                        invoke_hpp::invoke(f, e);
-                        p.reject(e);
+                        invoke_hpp::invoke(
+                            std::forward<decltype(f)>(f),
+                            e);
+                        n.reject(e);
                     } catch (...) {
-                        p.reject(std::current_exception());
+                        n.reject(std::current_exception());
                     }
-                }, other, std::forward<RejectF>(reject), std::placeholders::_1);
+                };
 
                 std::lock_guard<std::mutex> guard(mutex_);
 
                 if ( status_ == status::resolved ) {
-                    resolve_h();
+                    invoke_hpp::invoke(
+                        std::move(resolve_h));
                 } else if ( status_ == status::rejected ) {
-                    reject_h(exception_);
+                    invoke_hpp::invoke(
+                        std::move(reject_h),
+                        exception_);
                 } else {
                     handlers_.emplace_back(
                         std::move(resolve_h),
@@ -420,31 +572,43 @@ namespace promise_hpp
 
             template < typename U, typename ResolveF, typename RejectF >
             std::enable_if_t<std::is_void<U>::value, void>
-            attach(promise<U>& other, ResolveF&& resolve, RejectF&& reject) {
-                auto resolve_h = std::bind([](promise<U>& p, const ResolveF& f){
+            attach(promise<U>& next, ResolveF&& resolve, RejectF&& reject) {
+                auto resolve_h = [
+                    n = next,
+                    f = std::forward<ResolveF>(resolve)
+                ]() mutable {
                     try {
-                        invoke_hpp::invoke(f);
-                        p.resolve();
+                        invoke_hpp::invoke(
+                            std::forward<decltype(f)>(f));
+                        n.resolve();
                     } catch (...) {
-                        p.reject(std::current_exception());
+                        n.reject(std::current_exception());
                     }
-                }, other, std::forward<ResolveF>(resolve));
+                };
 
-                auto reject_h = std::bind([](promise<U>& p, const RejectF& f, std::exception_ptr e){
+                auto reject_h = [
+                    n = next,
+                    f = std::forward<RejectF>(reject)
+                ](std::exception_ptr e) mutable {
                     try {
-                        invoke_hpp::invoke(f, e);
-                        p.reject(e);
+                        invoke_hpp::invoke(
+                            std::forward<decltype(f)>(f),
+                            e);
+                        n.reject(e);
                     } catch (...) {
-                        p.reject(std::current_exception());
+                        n.reject(std::current_exception());
                     }
-                }, other, std::forward<RejectF>(reject), std::placeholders::_1);
+                };
 
                 std::lock_guard<std::mutex> guard(mutex_);
 
                 if ( status_ == status::resolved ) {
-                    resolve_h();
+                    invoke_hpp::invoke(
+                        std::move(resolve_h));
                 } else if ( status_ == status::rejected ) {
-                    reject_h(exception_);
+                    invoke_hpp::invoke(
+                        std::move(reject_h),
+                        exception_);
                 } else {
                     handlers_.emplace_back(
                         std::move(resolve_h),
@@ -487,4 +651,63 @@ namespace promise_hpp
             std::vector<handler> handlers_;
         };
     };
+
+    //
+    // make_promise
+    //
+
+    template < typename R, typename F >
+    promise<R> make_promise(F&& f) {
+        promise<R> result;
+
+        auto resolver = [
+            p = result
+        ](auto&& v) mutable {
+            p.resolve(std::forward<decltype(v)>(v));
+        };
+
+        auto rejector = [
+            p = result
+        ](auto&& e) mutable {
+            p.reject(std::forward<decltype(e)>(e));
+        };
+
+        try {
+            invoke_hpp::invoke(
+                std::forward<F>(f),
+                std::move(resolver),
+                std::move(rejector));
+        } catch (...) {
+            result.reject(std::current_exception());
+        }
+
+        return result;
+    }
+
+    inline promise<void> make_resolved_promise() {
+        promise<void> result;
+        result.resolve();
+        return result;
+    }
+
+    template < typename R >
+    promise<std::decay_t<R>> make_resolved_promise(R&& v) {
+        promise<std::decay_t<R>> result;
+        result.resolve(std::forward<R>(v));
+        return result;
+    }
+
+    template < typename E >
+    promise<void> make_rejected_promise(E&& e) {
+        promise<void> result;
+        result.reject(std::forward<E>(e));
+        return result;
+    }
+
+    template < typename R, typename E >
+    promise<R> make_rejected_promise(E&& e) {
+        promise<R> result;
+        result.reject(std::forward<E>(e));
+        return result;
+    }
 }
