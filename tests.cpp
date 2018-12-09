@@ -426,6 +426,25 @@ TEST_CASE("promise") {
             REQUIRE(check_84_int == 84);
         }
     }
+    SECTION("lazy_chaining") {
+        {
+            int check_84_int = 0;
+            auto p1 = pr::make_promise<int>();
+            auto p2 = pr::make_promise<int>();
+
+            p1.then([&p2](int v){
+                return p2;
+            }).then([&check_84_int](int v2){
+                check_84_int = v2;
+            });
+
+            REQUIRE(check_84_int == 0);
+            p1.resolve(42);
+            REQUIRE(check_84_int == 0);
+            p2.resolve(84);
+            REQUIRE(check_84_int == 84);
+        }
+    }
     SECTION("typed_chaining_fails") {
         {
             bool call_fail_with_logic_error = false;

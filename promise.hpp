@@ -656,6 +656,11 @@ namespace promise_hpp
     // make_promise
     //
 
+    template < typename R >
+    promise<R> make_promise() {
+        return promise<R>();
+    }
+
     template < typename R, typename F >
     promise<R> make_promise(F&& f) {
         promise<R> result;
