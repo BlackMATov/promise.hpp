@@ -115,16 +115,6 @@ TEST_CASE("promise") {
             REQUIRE(check_42_int == 42);
         }
         {
-            int check_42_int = 0;
-            pr::promise<int>()
-            .resolve(42)
-            .then([&check_42_int](int value){
-                check_42_int = value;
-            }, [](std::exception_ptr){
-            });
-            REQUIRE(check_42_int == 42);
-        }
-        {
             int check_84_int = 0;
             bool check_void_call = false;
             int check_100500_transform = 0;
@@ -167,7 +157,7 @@ TEST_CASE("promise") {
             pr::promise<int>()
             .reject(ee)
             .then([](int){
-            }).fail([&call_fail_with_logic_error](const std::exception_ptr& e){
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(call_fail_with_logic_error);
@@ -178,7 +168,7 @@ TEST_CASE("promise") {
             pr::promise<int>()
             .reject(std::make_exception_ptr(ee))
             .then([](int){
-            }).fail([&call_fail_with_logic_error](const std::exception_ptr& e){
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(call_fail_with_logic_error);
@@ -380,6 +370,188 @@ TEST_CASE("promise") {
 
             REQUIRE(pa_value == 84);
             REQUIRE(pb_value == 21);
+        }
+    }
+    SECTION("chaining") {
+        {
+            int check_84_int = 0;
+            auto p1 = pr::make_resolved_promise(42);
+            auto p2 = pr::make_resolved_promise(84);
+
+            p1.then([&p2](int v){
+                return p2;
+            }).then([&check_84_int](int v2){
+                check_84_int = v2;
+            });
+
+            REQUIRE(check_84_int == 84);
+        }
+        {
+            int check_84_int = 0;
+            auto p1 = pr::make_resolved_promise();
+            auto p2 = pr::make_resolved_promise(84);
+
+            p1.then([&p2](){
+                return p2;
+            }).then([&check_84_int](int v){
+                check_84_int = v;
+            });
+
+            REQUIRE(check_84_int == 84);
+        }
+        {
+            int check_84_int = 0;
+            auto p1 = pr::make_resolved_promise(42);
+            auto p2 = pr::make_resolved_promise();
+
+            p1.then([&p2](int v){
+                return p2;
+            }).then([&check_84_int](){
+                check_84_int = 84;
+            });
+
+            REQUIRE(check_84_int == 84);
+        }
+        {
+            int check_84_int = 0;
+            auto p1 = pr::make_resolved_promise();
+            auto p2 = pr::make_resolved_promise();
+
+            p1.then([&p2](){
+                return p2;
+            }).then([&check_84_int](){
+                check_84_int = 84;
+            });
+
+            REQUIRE(check_84_int == 84);
+        }
+    }
+    SECTION("typed_chaining_fails") {
+        {
+            bool call_fail_with_logic_error = false;
+            auto p1 = pr::make_resolved_promise(42);
+            auto p2 = pr::make_resolved_promise(84);
+
+            p1.then([&p2](int v){
+                (void)v;
+                throw std::logic_error("hello fail");
+                return p2;
+            }).then([&call_fail_with_logic_error](int v2){
+                (void)v2;
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+
+            REQUIRE(call_fail_with_logic_error);
+        }
+        {
+            bool call_fail_with_logic_error = false;
+            auto p1 = pr::make_resolved_promise(42);
+            auto p2 = pr::make_resolved_promise(84);
+
+            p1.then([&p2](int v){
+                (void)v;
+                return p2;
+            }).then([&call_fail_with_logic_error](int v2){
+                (void)v2;
+                throw std::logic_error("hello fail");
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+
+            REQUIRE(call_fail_with_logic_error);
+        }
+        {
+            bool call_fail_with_logic_error = false;
+            auto p1 = pr::make_rejected_promise<int>(std::logic_error("hello fail"));
+            auto p2 = pr::make_resolved_promise(84);
+
+            p1.then([&p2](int v){
+                (void)v;
+                return p2;
+            }).then([&call_fail_with_logic_error](int v2){
+                (void)v2;
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+
+            REQUIRE(call_fail_with_logic_error);
+        }
+        {
+            bool call_fail_with_logic_error = false;
+            auto p1 = pr::make_resolved_promise(42);
+            auto p2 = pr::make_rejected_promise<int>(std::logic_error("hello fail"));
+
+            p1.then([&p2](int v){
+                (void)v;
+                return p2;
+            }).then([&call_fail_with_logic_error](int v2){
+                (void)v2;
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+
+            REQUIRE(call_fail_with_logic_error);
+        }
+    }
+    SECTION("void_chaining_fails") {
+        {
+            bool call_fail_with_logic_error = false;
+            auto p1 = pr::make_resolved_promise();
+            auto p2 = pr::make_resolved_promise();
+
+            p1.then([&p2](){
+                throw std::logic_error("hello fail");
+                return p2;
+            }).then([&call_fail_with_logic_error](){
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+
+            REQUIRE(call_fail_with_logic_error);
+        }
+        {
+            bool call_fail_with_logic_error = false;
+            auto p1 = pr::make_resolved_promise();
+            auto p2 = pr::make_resolved_promise();
+
+            p1.then([&p2](){
+                return p2;
+            }).then([&call_fail_with_logic_error](){
+                throw std::logic_error("hello fail");
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+
+            REQUIRE(call_fail_with_logic_error);
+        }
+        {
+            bool call_fail_with_logic_error = false;
+            auto p1 = pr::make_rejected_promise<void>(std::logic_error("hello fail"));
+            auto p2 = pr::make_resolved_promise();
+
+            p1.then([&p2](){
+                return p2;
+            }).then([&call_fail_with_logic_error](){
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+
+            REQUIRE(call_fail_with_logic_error);
+        }
+        {
+            bool call_fail_with_logic_error = false;
+            auto p1 = pr::make_resolved_promise();
+            auto p2 = pr::make_rejected_promise<void>(std::logic_error("hello fail"));
+
+            p1.then([&p2](){
+                return p2;
+            }).then([&call_fail_with_logic_error](){
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+
+            REQUIRE(call_fail_with_logic_error);
         }
     }
 }
