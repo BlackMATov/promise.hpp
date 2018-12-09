@@ -5,9 +5,11 @@
 
 #include <new>
 #include <mutex>
+#include <atomic>
 #include <memory>
 #include <vector>
 #include <utility>
+#include <iterator>
 #include <exception>
 #include <stdexcept>
 #include <functional>
@@ -183,6 +185,18 @@ namespace promise_hpp
             });
 
             return next;
+        }
+
+        template < typename ResolveF >
+        auto then_all(ResolveF&& on_resolve) {
+            return then([
+                f = std::forward<ResolveF>(on_resolve)
+            ](const T& v) mutable {
+                auto r = invoke_hpp::invoke(
+                    std::forward<decltype(f)>(f),
+                    v);
+                return make_all_promise(std::move(r));
+            });
         }
 
         template < typename ResolveF
@@ -458,6 +472,17 @@ namespace promise_hpp
             return next;
         }
 
+        template < typename ResolveF >
+        auto then_all(ResolveF&& on_resolve) {
+            return then([
+                f = std::forward<ResolveF>(on_resolve)
+            ]() mutable {
+                auto r = invoke_hpp::invoke(
+                    std::forward<decltype(f)>(f));
+                return make_all_promise(std::move(r));
+            });
+        }
+
         template < typename ResolveF
                  , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF> >
         std::enable_if_t<
@@ -689,6 +714,10 @@ namespace promise_hpp
         return result;
     }
 
+    //
+    // make_resolved_promise
+    //
+
     inline promise<void> make_resolved_promise() {
         promise<void> result;
         result.resolve();
@@ -702,6 +731,10 @@ namespace promise_hpp
         return result;
     }
 
+    //
+    // make_rejected_promise
+    //
+
     template < typename E >
     promise<void> make_rejected_promise(E&& e) {
         promise<void> result;
@@ -714,5 +747,58 @@ namespace promise_hpp
         promise<R> result;
         result.reject(std::forward<E>(e));
         return result;
+    }
+
+    //
+    // make_all_promise
+    //
+
+    template < typename Iter >
+    auto make_all_promise(Iter begin, Iter end) {
+        using child_promise_t = typename Iter::value_type;
+        using child_promise_value_t = typename child_promise_t::value_type;
+        using promise_out_container_t = std::vector<child_promise_value_t>;
+
+        struct context_t {
+            promise_out_container_t results;
+            std::atomic_size_t counter = ATOMIC_VAR_INIT(0);
+
+            context_t(std::size_t count)
+            : results(count) {}
+
+            bool apply_result(std::size_t index, const child_promise_value_t& value) {
+                results[index] = value;
+                return ++counter == results.size();
+            }
+        };
+
+        if ( begin == end ) {
+            return make_resolved_promise(promise_out_container_t());
+        }
+
+        return make_promise<promise_out_container_t>([begin, end](auto&& resolver, auto&& rejector){
+            std::size_t result_index = 0;
+            auto context = std::make_shared<context_t>(std::distance(begin, end));
+            for ( auto iter = begin; iter != end; ++iter, ++result_index ) {
+                (*iter).then([
+                    context,
+                    resolver,
+                    result_index
+                ](const child_promise_value_t& v) mutable {
+                    if ( context->apply_result(result_index, v) ) {
+                        resolver(std::move(context->results));
+                    }
+                }).fail([rejector](std::exception_ptr e) mutable {
+                    rejector(e);
+                });
+            }
+        });
+    }
+
+    template < typename Container >
+    auto make_all_promise(Container&& container) {
+        return make_all_promise(
+            std::begin(container),
+            std::end(container));
     }
 }

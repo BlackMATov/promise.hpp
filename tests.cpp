@@ -573,4 +573,87 @@ TEST_CASE("promise") {
             REQUIRE(call_fail_with_logic_error);
         }
     }
+    SECTION("make_all_promise") {
+        {
+            bool all_is_ok = false;
+            pr::make_all_promise(std::vector<pr::promise<int>>())
+                .then([&all_is_ok](const std::vector<int>& c){
+                    all_is_ok = c.empty();
+                });
+            REQUIRE(all_is_ok);
+        }
+        {
+            bool all_is_ok = false;
+            auto p = pr::make_all_promise(std::vector<pr::promise<int>>{
+                pr::make_resolved_promise(32),
+                pr::make_resolved_promise(10)
+            }).then([&all_is_ok](const std::vector<int>& c){
+                all_is_ok = (2 == c.size())
+                    && c[0] == 32
+                    && c[1] == 10;
+            });
+            REQUIRE(all_is_ok);
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<int>();
+
+            int call_then_only_once = 0;
+            pr::make_all_promise(std::vector<pr::promise<int>>{p1, p2})
+            .then([&call_then_only_once](const std::vector<int>& c){
+                ++call_then_only_once;
+            });
+
+            p1.resolve(1);
+            p2.resolve(2);
+
+            REQUIRE(call_then_only_once == 1);
+        }
+    }
+    SECTION("make_all_promise_fail") {
+        {
+            bool call_fail_with_logic_error = false;
+            bool not_call_then_on_reject = true;
+            auto p = pr::make_all_promise(std::vector<pr::promise<int>>{
+                pr::make_rejected_promise<int>(std::logic_error("hello fail")),
+                pr::make_resolved_promise(10)
+            }).then([&not_call_then_on_reject](const std::vector<int>& c){
+                (void)c;
+                not_call_then_on_reject = false;
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+            REQUIRE(not_call_then_on_reject);
+            REQUIRE(call_fail_with_logic_error);
+        }
+    }
+    SECTION("then_all") {
+        {
+            int check_42_int = 0;
+            pr::make_resolved_promise()
+            .then_all([](){
+                return std::vector<pr::promise<int>>{
+                    pr::make_resolved_promise(32),
+                    pr::make_resolved_promise(10)};
+            }).then([&check_42_int](const std::vector<int>& v){
+                check_42_int = std::accumulate(v.begin(), v.end(), 0);
+            });
+            REQUIRE(check_42_int == 42);
+        }
+        {
+            int check_42_int = 0;
+            int check_42_int2 = 0;
+            pr::make_resolved_promise(42)
+            .then_all([&check_42_int](int v){
+                check_42_int = v;
+                return std::vector<pr::promise<int>>{
+                    pr::make_resolved_promise(32),
+                    pr::make_resolved_promise(10)};
+            }).then([&check_42_int2](const std::vector<int>& v){
+                check_42_int2 = std::accumulate(v.begin(), v.end(), 0);
+            });
+            REQUIRE(check_42_int == 42);
+            REQUIRE(check_42_int2 == 42);
+        }
+    }
 }
