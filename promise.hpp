@@ -238,7 +238,7 @@ namespace promise_hpp
         }
 
         template < typename RejectF >
-        promise<T> fail(RejectF&& on_reject) {
+        promise<T> except(RejectF&& on_reject) {
             return then(
                 [](const T& value) { return value; },
                 std::forward<RejectF>(on_reject));
@@ -540,7 +540,7 @@ namespace promise_hpp
         }
 
         template < typename RejectF >
-        promise<void> fail(RejectF&& on_reject) {
+        promise<void> except(RejectF&& on_reject) {
             return then(
                 []{},
                 std::forward<RejectF>(on_reject));
@@ -727,16 +727,12 @@ namespace promise_hpp
     promise<R> make_promise(F&& f) {
         promise<R> result;
 
-        auto resolver = [
-            p = result
-        ](auto&& v) mutable {
-            return p.resolve(std::forward<decltype(v)>(v));
+        auto resolver = [result](auto&& v) mutable {
+            return result.resolve(std::forward<decltype(v)>(v));
         };
 
-        auto rejector = [
-            p = result
-        ](auto&& e) mutable {
-            return p.reject(std::forward<decltype(e)>(e));
+        auto rejector = [result](auto&& e) mutable {
+            return result.reject(std::forward<decltype(e)>(e));
         };
 
         try {
@@ -825,9 +821,7 @@ namespace promise_hpp
                     if ( context->apply_result(result_index, v) ) {
                         resolver(std::move(context->results));
                     }
-                }).fail([rejector](std::exception_ptr e) mutable {
-                    rejector(e);
-                });
+                }, rejector);
             }
         });
     }
@@ -854,11 +848,7 @@ namespace promise_hpp
 
         return make_promise<child_promise_value_t>([begin, end](auto&& resolver, auto&& rejector){
             for ( auto iter = begin; iter != end; ++iter ) {
-                (*iter).then([resolver](const child_promise_value_t& v) mutable {
-                    resolver(v);
-                }).fail([rejector](std::exception_ptr e) mutable {
-                    rejector(e);
-                });
+                (*iter).then(resolver, rejector);
             }
         });
     }

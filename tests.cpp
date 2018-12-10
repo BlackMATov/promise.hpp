@@ -118,7 +118,7 @@ TEST_CASE("promise") {
             int check_42_int = 0;
             auto p = pr::promise<int>();
             p.resolve(42);
-            p.fail([](std::exception_ptr){
+            p.except([](std::exception_ptr){
             }).then([&check_42_int](int value){
                 check_42_int = value;
             });
@@ -155,7 +155,7 @@ TEST_CASE("promise") {
             p.then([&not_call_then_on_reject](int value) {
                 (void)value;
                 not_call_then_on_reject = false;
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(not_call_then_on_reject);
@@ -167,7 +167,7 @@ TEST_CASE("promise") {
             auto p = pr::promise<int>();
             p.reject(ee);
             p.then([](int){
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(call_fail_with_logic_error);
@@ -178,7 +178,7 @@ TEST_CASE("promise") {
             auto p = pr::promise<int>();
             p.reject(std::make_exception_ptr(ee));
             p.then([](int){
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(call_fail_with_logic_error);
@@ -187,9 +187,9 @@ TEST_CASE("promise") {
             int check_multi_fail = 0;
             auto p = pr::promise<>();
             p.reject(std::logic_error("hello fail"));
-            p.fail([&check_multi_fail](std::exception_ptr){
+            p.except([&check_multi_fail](std::exception_ptr){
                 ++check_multi_fail;
-            }).fail([&check_multi_fail](std::exception_ptr){
+            }).except([&check_multi_fail](std::exception_ptr){
                 ++check_multi_fail;
             });
             REQUIRE(check_multi_fail == 2);
@@ -219,7 +219,7 @@ TEST_CASE("promise") {
             auto p = pr::promise<int>();
             p.then([&not_call_then_on_reject](int){
                 not_call_then_on_reject = false;
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(not_call_then_on_reject);
@@ -249,7 +249,7 @@ TEST_CASE("promise") {
                 (void)resolve;
                 reject(std::logic_error("hello fail"));
             });
-            p.fail([&call_fail_with_logic_error](std::exception_ptr e){
+            p.except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(call_fail_with_logic_error);
@@ -261,7 +261,7 @@ TEST_CASE("promise") {
                 (void)reject;
                 throw std::logic_error("hello fail");
             });
-            p.fail([&call_fail_with_logic_error](std::exception_ptr e){
+            p.except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(call_fail_with_logic_error);
@@ -289,7 +289,7 @@ TEST_CASE("promise") {
         {
             bool call_fail_with_logic_error = false;
             pr::make_rejected_promise<int>(std::logic_error("hello fail"))
-            .fail([&call_fail_with_logic_error](std::exception_ptr e){
+            .except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(call_fail_with_logic_error);
@@ -297,7 +297,7 @@ TEST_CASE("promise") {
         {
             bool call_fail_with_logic_error = false;
             pr::make_rejected_promise(std::logic_error("hello fail"))
-            .fail([&call_fail_with_logic_error](std::exception_ptr e){
+            .except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(call_fail_with_logic_error);
@@ -313,7 +313,7 @@ TEST_CASE("promise") {
                 throw std::logic_error("hello fail");
             }).then([&not_call_then_on_reject](){
                 not_call_then_on_reject = false;
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(not_call_then_on_reject);
@@ -328,7 +328,7 @@ TEST_CASE("promise") {
                 throw std::logic_error("hello fail");
             }, [](std::exception_ptr){
                 throw std::logic_error("hello fail2");
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail2_exception(e);
             });
             REQUIRE(not_call_then_on_reject);
@@ -372,7 +372,7 @@ TEST_CASE("promise") {
             {
                 auto pa = p.then([](int){
                     throw std::logic_error("hello fail");
-                }).fail([&pa_value](std::exception_ptr e){
+                }).except([&pa_value](std::exception_ptr e){
                     if ( check_hello_fail_exception(e) ) {
                         pa_value = 84;
                     }
@@ -485,7 +485,7 @@ TEST_CASE("promise") {
                 return p2;
             }).then([](int v2){
                 (void)v2;
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
 
@@ -502,7 +502,7 @@ TEST_CASE("promise") {
             }).then([](int v2){
                 (void)v2;
                 throw std::logic_error("hello fail");
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
 
@@ -518,7 +518,7 @@ TEST_CASE("promise") {
                 return p2;
             }).then([](int v2){
                 (void)v2;
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
 
@@ -534,7 +534,7 @@ TEST_CASE("promise") {
                 return p2;
             }).then([](int v2){
                 (void)v2;
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
 
@@ -551,7 +551,7 @@ TEST_CASE("promise") {
                 throw std::logic_error("hello fail");
                 return p2;
             }).then([](){
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
 
@@ -566,7 +566,7 @@ TEST_CASE("promise") {
                 return p2;
             }).then([](){
                 throw std::logic_error("hello fail");
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
 
@@ -580,7 +580,7 @@ TEST_CASE("promise") {
             p1.then([&p2](){
                 return p2;
             }).then([](){
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
 
@@ -594,7 +594,7 @@ TEST_CASE("promise") {
             p1.then([&p2](){
                 return p2;
             }).then([](){
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
 
@@ -691,7 +691,7 @@ TEST_CASE("promise") {
             }).then([&not_call_then_on_reject](const std::vector<int>& c){
                 (void)c;
                 not_call_then_on_reject = false;
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(not_call_then_on_reject);
@@ -711,7 +711,7 @@ TEST_CASE("promise") {
             }).then([&not_call_then_on_reject](const int& c){
                 (void)c;
                 not_call_then_on_reject = false;
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(not_call_then_on_reject);
@@ -771,7 +771,7 @@ TEST_CASE("promise") {
                 return std::vector<pr::promise<int>>{
                     pr::make_rejected_promise<int>(std::logic_error("hello fail")),
                     pr::make_resolved_promise(42)};
-            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(call_fail_with_logic_error);
