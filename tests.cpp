@@ -18,6 +18,16 @@ namespace
             return false;
         }
     }
+
+    bool check_hello_fail2_exception(std::exception_ptr e) {
+        try {
+            std::rethrow_exception(e);
+        } catch (std::logic_error& ee) {
+            return 0 == std::strcmp(ee.what(), "hello fail2");
+        } catch (...) {
+            return false;
+        }
+    }
 }
 
 TEST_CASE("is_promise") {
@@ -305,6 +315,21 @@ TEST_CASE("promise") {
                 not_call_then_on_reject = false;
             }).fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+            REQUIRE(not_call_then_on_reject);
+            REQUIRE(call_fail_with_logic_error);
+        }
+        {
+            bool not_call_then_on_reject = true;
+            bool call_fail_with_logic_error = false;
+            auto p = pr::promise<int>();
+            p.resolve(42);
+            p.then([](int){
+                throw std::logic_error("hello fail");
+            }, [](std::exception_ptr){
+                throw std::logic_error("hello fail2");
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail2_exception(e);
             });
             REQUIRE(not_call_then_on_reject);
             REQUIRE(call_fail_with_logic_error);
