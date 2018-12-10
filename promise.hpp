@@ -1,3 +1,9 @@
+/*******************************************************************************
+ * This file is part of the "promise.hpp"
+ * For conditions of distribution and use, see copyright notice in LICENSE.md
+ * Copyright (C) 2018 Matvey Cherevko
+ ******************************************************************************/
+
 #pragma once
 
 #include <cstdint>
@@ -418,9 +424,9 @@ namespace promise_hpp
                 auto np = invoke_hpp::invoke(
                     std::forward<decltype(f)>(f),
                     v);
-                np.then([n = n]() mutable {
+                np.then([n]() mutable {
                     n.resolve();
-                }, [n = n](std::exception_ptr e) mutable {
+                }, [n](std::exception_ptr e) mutable {
                     n.reject(e);
                 });
             }, [n = next](std::exception_ptr e) mutable {
@@ -445,9 +451,9 @@ namespace promise_hpp
                 auto np = invoke_hpp::invoke(
                     std::forward<decltype(f)>(f),
                     v);
-                np.then([n = n](const typename ResolveFR::value_type& nv) mutable {
+                np.then([n](const typename ResolveFR::value_type& nv) mutable {
                     n.resolve(nv);
-                }, [n = n](std::exception_ptr e) mutable {
+                }, [n](std::exception_ptr e) mutable {
                     n.reject(e);
                 });
             }, [n = next](std::exception_ptr e) mutable {
@@ -746,9 +752,9 @@ namespace promise_hpp
             ]() mutable {
                 auto np = invoke_hpp::invoke(
                     std::forward<decltype(f)>(f));
-                np.then([n = n]() mutable {
+                np.then([n]() mutable {
                     n.resolve();
-                }, [n = n](std::exception_ptr e) mutable {
+                }, [n](std::exception_ptr e) mutable {
                     n.reject(e);
                 });
             }, [n = next](std::exception_ptr e) mutable {
@@ -772,9 +778,9 @@ namespace promise_hpp
             ]() mutable {
                 auto np = invoke_hpp::invoke(
                     std::forward<decltype(f)>(f));
-                np.then([n = n](const typename ResolveFR::value_type& nv) mutable {
+                np.then([n](const typename ResolveFR::value_type& nv) mutable {
                     n.resolve(nv);
-                }, [n = n](std::exception_ptr e) mutable {
+                }, [n](std::exception_ptr e) mutable {
                     n.reject(e);
                 });
             }, [n = next](std::exception_ptr e) mutable {
