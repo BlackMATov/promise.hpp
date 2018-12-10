@@ -41,13 +41,13 @@ promise<std::string> download(const std::string& url)
     promise<std::string> result;
 
     web_client.download_with_callbacks(
-        [result](const std::string& html)
+        [result](const std::string& html) mutable
         {
             result.resolve(html);
         },
-        [result](int error_code)
+        [result](int error_code) mutable
         {
-            result.reject(std::runtime_error("error code: " + std::string(error_code)));
+            result.reject(std::runtime_error("error code: " + std::to_string(error_code)));
         });
 
     return result;
@@ -61,13 +61,13 @@ promise<std::string> p = make_promise<std::string>(
     [](auto&& resolver, auto&& rejector)
     {
         web_client.download_with_callbacks(
-            [resolver](const std::string& html)
+            [resolver](const std::string& html) mutable
             {
                 resolver(html);
             },
-            [rejector](int error_code)
+            [rejector](int error_code) mutable
             {
-                rejector(std::runtime_error("error code: " + std::string(error_code)));
+                rejector(std::runtime_error("error code: " + std::to_string(error_code)));
             });
     });
 ```
@@ -138,7 +138,7 @@ std::vector<std::string> urls{
 std::vector<promise<std::string>> url_promises;
 std::transform(urls.begin(), urls.end(), url_promises.begin(), download);
 
-pr::make_all_promise(url_promises)
+make_all_promise(url_promises)
     .then([](const std::vector<std::string>& pages)
     {
         std::vector<std::string> all_links;
@@ -165,7 +165,7 @@ pr::make_all_promise(url_promises)
 download("http://www.google.com")
     .then_all([](const std::string& html)
     {
-        std::vector<pr::promise<std::string>> url_promises;
+        std::vector<promise<std::string>> url_promises;
         std::vector<std::string> links = extract_all_links(html);
         std::transform(links.begin(), links.end(), url_promises.begin(), download);
         return url_promises;
