@@ -380,6 +380,29 @@ namespace promise_hpp
         promise()
         : state_(std::make_shared<state>()) {}
 
+        promise(const promise&) noexcept = default;
+        promise& operator=(const promise&) noexcept = default;
+
+        void swap(promise& other) noexcept {
+            state_.swap(other.state_);
+        }
+
+        std::size_t hash() const noexcept {
+            return std::hash<state*>()(state_.get());
+        }
+
+        friend bool operator<(const promise& l, const promise& r) noexcept {
+            return l.state_ < r.state_;
+        }
+
+        friend bool operator==(const promise& l, const promise& r) noexcept {
+            return l.state_ == r.state_;
+        }
+
+        friend bool operator!=(const promise& l, const promise& r) noexcept {
+            return l.state_ != r.state_;
+        }
+
         template < typename ResolveF
                  , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF,T> >
         std::enable_if_t<
@@ -686,6 +709,29 @@ namespace promise_hpp
         promise()
         : state_(std::make_shared<state>()) {}
 
+        promise(const promise&) noexcept = default;
+        promise& operator=(const promise&) noexcept = default;
+
+        void swap(promise& other) noexcept {
+            state_.swap(other.state_);
+        }
+
+        std::size_t hash() const noexcept {
+            return std::hash<state*>()(state_.get());
+        }
+
+        friend bool operator<(const promise& l, const promise& r) noexcept {
+            return l.state_ < r.state_;
+        }
+
+        friend bool operator==(const promise& l, const promise& r) noexcept {
+            return l.state_ == r.state_;
+        }
+
+        friend bool operator!=(const promise& l, const promise& r) noexcept {
+            return l.state_ != r.state_;
+        }
+
         template < typename ResolveF
                  , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF> >
         std::enable_if_t<
@@ -962,6 +1008,15 @@ namespace promise_hpp
     };
 
     //
+    // swap
+    //
+
+    template < typename T >
+    void swap(promise<T>& l, promise<T>& r) noexcept {
+        l.swap(r);
+    }
+
+    //
     // make_promise
     //
 
@@ -1106,4 +1161,16 @@ namespace promise_hpp
             std::begin(container),
             std::end(container));
     }
+}
+
+namespace std
+{
+    template < typename T >
+    struct hash<promise_hpp::promise<T>>
+        : std::unary_function<promise_hpp::promise<T>, std::size_t>
+    {
+        std::size_t operator()(const promise_hpp::promise<T>& p) const noexcept {
+            return p.hash();
+        }
+    };
 }
