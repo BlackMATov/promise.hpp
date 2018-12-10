@@ -199,6 +199,18 @@ namespace promise_hpp
             });
         }
 
+        template < typename ResolveF >
+        auto then_any(ResolveF&& on_resolve) {
+            return then([
+                f = std::forward<ResolveF>(on_resolve)
+            ](const T& v) mutable {
+                auto r = invoke_hpp::invoke(
+                    std::forward<decltype(f)>(f),
+                    v);
+                return make_any_promise(std::move(r));
+            });
+        }
+
         template < typename ResolveF
                  , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF,T> >
         std::enable_if_t<
@@ -224,20 +236,17 @@ namespace promise_hpp
         }
 
         template < typename U >
-        promise& resolve(U&& value) {
-            state_->resolve(std::forward<U>(value));
-            return *this;
+        bool resolve(U&& value) {
+            return state_->resolve(std::forward<U>(value));
         }
 
-        promise& reject(std::exception_ptr e) {
-            state_->reject(e);
-            return *this;
+        bool reject(std::exception_ptr e) {
+            return state_->reject(e);
         }
 
         template < typename E >
-        promise& reject(E&& e) {
-            state_->reject(std::make_exception_ptr(std::forward<E>(e)));
-            return *this;
+        bool reject(E&& e) {
+            return state_->reject(std::make_exception_ptr(std::forward<E>(e)));
         }
     private:
         class state;
@@ -248,24 +257,26 @@ namespace promise_hpp
             state() = default;
 
             template < typename U >
-            void resolve(U&& value) {
+            bool resolve(U&& value) {
                 std::lock_guard<std::mutex> guard(mutex_);
                 if ( status_ != status::pending ) {
-                    throw std::logic_error("do not try to resolve a resolved or rejected promise");
+                    return false;
                 }
                 storage_.set(std::forward<U>(value));
                 status_ = status::resolved;
                 invoke_resolve_handlers_();
+                return true;
             }
 
-            void reject(std::exception_ptr e) {
+            bool reject(std::exception_ptr e) {
                 std::lock_guard<std::mutex> guard(mutex_);
                 if ( status_ != status::pending ) {
-                    throw std::logic_error("do not try to reject a resolved or rejected promise");
+                    return false;
                 }
                 exception_ = e;
                 status_ = status::rejected;
                 invoke_reject_handlers_();
+                return true;
             }
 
             template < typename U, typename ResolveF, typename RejectF >
@@ -483,6 +494,17 @@ namespace promise_hpp
             });
         }
 
+        template < typename ResolveF >
+        auto then_any(ResolveF&& on_resolve) {
+            return then([
+                f = std::forward<ResolveF>(on_resolve)
+            ]() mutable {
+                auto r = invoke_hpp::invoke(
+                    std::forward<decltype(f)>(f));
+                return make_any_promise(std::move(r));
+            });
+        }
+
         template < typename ResolveF
                  , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF> >
         std::enable_if_t<
@@ -507,20 +529,17 @@ namespace promise_hpp
             return next;
         }
 
-        promise& resolve() {
-            state_->resolve();
-            return *this;
+        bool resolve() {
+            return state_->resolve();
         }
 
-        promise& reject(std::exception_ptr e) {
-            state_->reject(e);
-            return *this;
+        bool reject(std::exception_ptr e) {
+            return state_->reject(e);
         }
 
         template < typename E >
-        promise& reject(E&& e) {
-            state_->reject(std::make_exception_ptr(std::forward<E>(e)));
-            return *this;
+        bool reject(E&& e) {
+            return state_->reject(std::make_exception_ptr(std::forward<E>(e)));
         }
     private:
         class state;
@@ -530,23 +549,25 @@ namespace promise_hpp
         public:
             state() = default;
 
-            void resolve() {
+            bool resolve() {
                 std::lock_guard<std::mutex> guard(mutex_);
                 if ( status_ != status::pending ) {
-                    throw std::logic_error("do not try to resolve a resolved or rejected promise");
+                    return false;
                 }
                 status_ = status::resolved;
                 invoke_resolve_handlers_();
+                return true;
             }
 
-            void reject(std::exception_ptr e) {
+            bool reject(std::exception_ptr e) {
                 std::lock_guard<std::mutex> guard(mutex_);
                 if ( status_ != status::pending ) {
-                    throw std::logic_error("do not try to reject a resolved or rejected promise");
+                    return false;
                 }
                 exception_ = e;
                 status_ = status::rejected;
                 invoke_reject_handlers_();
+                return true;
             }
 
             template < typename U, typename ResolveF, typename RejectF >
@@ -693,13 +714,13 @@ namespace promise_hpp
         auto resolver = [
             p = result
         ](auto&& v) mutable {
-            p.resolve(std::forward<decltype(v)>(v));
+            return p.resolve(std::forward<decltype(v)>(v));
         };
 
         auto rejector = [
             p = result
         ](auto&& e) mutable {
-            p.reject(std::forward<decltype(e)>(e));
+            return p.reject(std::forward<decltype(e)>(e));
         };
 
         try {
@@ -798,6 +819,37 @@ namespace promise_hpp
     template < typename Container >
     auto make_all_promise(Container&& container) {
         return make_all_promise(
+            std::begin(container),
+            std::end(container));
+    }
+
+    //
+    // make_any_promise
+    //
+
+    template < typename Iter >
+    auto make_any_promise(Iter begin, Iter end) {
+        using child_promise_t = typename Iter::value_type;
+        using child_promise_value_t = typename child_promise_t::value_type;
+
+        if ( begin == end ) {
+            throw std::logic_error("at least one input promise must be provided for make_any_promise");
+        }
+
+        return make_promise<child_promise_value_t>([begin, end](auto&& resolver, auto&& rejector){
+            for ( auto iter = begin; iter != end; ++iter ) {
+                (*iter).then([resolver](const child_promise_value_t& v) mutable {
+                    resolver(v);
+                }).fail([rejector](std::exception_ptr e) mutable {
+                    rejector(e);
+                });
+            }
+        });
+    }
+
+    template < typename Container >
+    auto make_any_promise(Container&& container) {
+        return make_any_promise(
             std::begin(container),
             std::end(container));
     }

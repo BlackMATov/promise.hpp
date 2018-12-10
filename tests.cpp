@@ -74,7 +74,7 @@ TEST_CASE("is_promise_r") {
             pr::is_promise_r<int, const pr::promise<int>>::value,
             "unit test fail");
         static_assert(
-            pr::is_promise_r<long, const pr::promise<int>>::value,
+            pr::is_promise_r<double, const pr::promise<int>>::value,
             "unit test fail");
     }
     SECTION("negative") {
@@ -88,7 +88,7 @@ TEST_CASE("is_promise_r") {
             !pr::is_promise_r<int, pr::promise<obj_t>>::value,
             "unit test fail");
         static_assert(
-            !pr::is_promise_r<long, int>::value,
+            !pr::is_promise_r<double, int>::value,
             "unit test fail");
     }
 }
@@ -97,18 +97,18 @@ TEST_CASE("promise") {
     SECTION("resolved") {
         {
             int check_42_int = 0;
-            pr::promise<int>()
-            .resolve(42)
-            .then([&check_42_int](int value){
+            auto p = pr::promise<int>();
+            p.resolve(42);
+            p.then([&check_42_int](int value){
                 check_42_int = value;
             });
             REQUIRE(check_42_int == 42);
         }
         {
             int check_42_int = 0;
-            pr::promise<int>()
-            .resolve(42)
-            .fail([](std::exception_ptr){
+            auto p = pr::promise<int>();
+            p.resolve(42);
+            p.fail([](std::exception_ptr){
             }).then([&check_42_int](int value){
                 check_42_int = value;
             });
@@ -118,9 +118,9 @@ TEST_CASE("promise") {
             int check_84_int = 0;
             bool check_void_call = false;
             int check_100500_transform = 0;
-            pr::promise<int>()
-            .resolve(42)
-            .then([](int value){
+            auto p = pr::promise<int>();
+            p.resolve(42);
+            p.then([](int value){
                 return value * 2;
             }).then([&check_84_int](int value){
                 check_84_int = value;
@@ -140,9 +140,9 @@ TEST_CASE("promise") {
         {
             bool call_fail_with_logic_error = false;
             bool not_call_then_on_reject = true;
-            pr::promise<int>()
-            .reject(std::logic_error("hello fail"))
-            .then([&not_call_then_on_reject](int value) {
+            auto p = pr::promise<int>();
+            p.reject(std::logic_error("hello fail"));
+            p.then([&not_call_then_on_reject](int value) {
                 (void)value;
                 not_call_then_on_reject = false;
             }).fail([&call_fail_with_logic_error](std::exception_ptr e){
@@ -154,9 +154,9 @@ TEST_CASE("promise") {
         {
             std::logic_error ee("hello fail");
             bool call_fail_with_logic_error = false;
-            pr::promise<int>()
-            .reject(ee)
-            .then([](int){
+            auto p = pr::promise<int>();
+            p.reject(ee);
+            p.then([](int){
             }).fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
@@ -165,9 +165,9 @@ TEST_CASE("promise") {
         {
             std::logic_error ee("hello fail");
             bool call_fail_with_logic_error = false;
-            pr::promise<int>()
-            .reject(std::make_exception_ptr(ee))
-            .then([](int){
+            auto p = pr::promise<int>();
+            p.reject(std::make_exception_ptr(ee));
+            p.then([](int){
             }).fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
@@ -175,9 +175,9 @@ TEST_CASE("promise") {
         }
         {
             int check_multi_fail = 0;
-            pr::promise<>()
-            .reject(std::logic_error("hello fail"))
-            .fail([&check_multi_fail](std::exception_ptr){
+            auto p = pr::promise<>();
+            p.reject(std::logic_error("hello fail"));
+            p.fail([&check_multi_fail](std::exception_ptr){
                 ++check_multi_fail;
             }).fail([&check_multi_fail](std::exception_ptr){
                 ++check_multi_fail;
@@ -285,7 +285,7 @@ TEST_CASE("promise") {
             REQUIRE(call_fail_with_logic_error);
         }
         {
-            bool call_fail_with_logic_error = 0;
+            bool call_fail_with_logic_error = false;
             pr::make_rejected_promise(std::logic_error("hello fail"))
             .fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
@@ -297,9 +297,9 @@ TEST_CASE("promise") {
         {
             bool not_call_then_on_reject = true;
             bool call_fail_with_logic_error = false;
-            pr::promise<int>()
-            .resolve(42)
-            .then([](int){
+            auto p = pr::promise<int>();
+            p.resolve(42);
+            p.then([](int){
                 throw std::logic_error("hello fail");
             }).then([&not_call_then_on_reject](){
                 not_call_then_on_reject = false;
@@ -379,6 +379,7 @@ TEST_CASE("promise") {
             auto p2 = pr::make_resolved_promise(84);
 
             p1.then([&p2](int v){
+                (void)v;
                 return p2;
             }).then([&check_84_int](int v2){
                 check_84_int = v2;
@@ -405,6 +406,7 @@ TEST_CASE("promise") {
             auto p2 = pr::make_resolved_promise();
 
             p1.then([&p2](int v){
+                (void)v;
                 return p2;
             }).then([&check_84_int](){
                 check_84_int = 84;
@@ -433,6 +435,7 @@ TEST_CASE("promise") {
             auto p2 = pr::make_promise<int>();
 
             p1.then([&p2](int v){
+                (void)v;
                 return p2;
             }).then([&check_84_int](int v2){
                 check_84_int = v2;
@@ -455,7 +458,7 @@ TEST_CASE("promise") {
                 (void)v;
                 throw std::logic_error("hello fail");
                 return p2;
-            }).then([&call_fail_with_logic_error](int v2){
+            }).then([](int v2){
                 (void)v2;
             }).fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
@@ -471,7 +474,7 @@ TEST_CASE("promise") {
             p1.then([&p2](int v){
                 (void)v;
                 return p2;
-            }).then([&call_fail_with_logic_error](int v2){
+            }).then([](int v2){
                 (void)v2;
                 throw std::logic_error("hello fail");
             }).fail([&call_fail_with_logic_error](std::exception_ptr e){
@@ -488,7 +491,7 @@ TEST_CASE("promise") {
             p1.then([&p2](int v){
                 (void)v;
                 return p2;
-            }).then([&call_fail_with_logic_error](int v2){
+            }).then([](int v2){
                 (void)v2;
             }).fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
@@ -504,7 +507,7 @@ TEST_CASE("promise") {
             p1.then([&p2](int v){
                 (void)v;
                 return p2;
-            }).then([&call_fail_with_logic_error](int v2){
+            }).then([](int v2){
                 (void)v2;
             }).fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
@@ -522,7 +525,7 @@ TEST_CASE("promise") {
             p1.then([&p2](){
                 throw std::logic_error("hello fail");
                 return p2;
-            }).then([&call_fail_with_logic_error](){
+            }).then([](){
             }).fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
@@ -536,7 +539,7 @@ TEST_CASE("promise") {
 
             p1.then([&p2](){
                 return p2;
-            }).then([&call_fail_with_logic_error](){
+            }).then([](){
                 throw std::logic_error("hello fail");
             }).fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
@@ -551,7 +554,7 @@ TEST_CASE("promise") {
 
             p1.then([&p2](){
                 return p2;
-            }).then([&call_fail_with_logic_error](){
+            }).then([](){
             }).fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
@@ -565,7 +568,7 @@ TEST_CASE("promise") {
 
             p1.then([&p2](){
                 return p2;
-            }).then([&call_fail_with_logic_error](){
+            }).then([](){
             }).fail([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
             });
@@ -601,12 +604,55 @@ TEST_CASE("promise") {
             int call_then_only_once = 0;
             pr::make_all_promise(std::vector<pr::promise<int>>{p1, p2})
             .then([&call_then_only_once](const std::vector<int>& c){
+                (void)c;
                 ++call_then_only_once;
             });
 
             p1.resolve(1);
             p2.resolve(2);
 
+            REQUIRE(call_then_only_once == 1);
+        }
+    }
+    SECTION("make_any_promise") {
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<int>();
+
+            int check_42_int = 0;
+            int call_then_only_once = 0;
+            pr::make_any_promise(std::vector<pr::promise<int>>{p1, p2})
+            .then([&check_42_int, &call_then_only_once](const int& v){
+                check_42_int = v;
+                ++call_then_only_once;
+            });
+
+            p1.resolve(42);
+            REQUIRE(check_42_int == 42);
+            REQUIRE(call_then_only_once == 1);
+
+            p2.resolve(84);
+            REQUIRE(check_42_int == 42);
+            REQUIRE(call_then_only_once == 1);
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<int>();
+
+            int check_42_int = 0;
+            int call_then_only_once = 0;
+            pr::make_any_promise(std::vector<pr::promise<int>>{p1, p2})
+            .then([&check_42_int, &call_then_only_once](const int& v){
+                check_42_int = v;
+                ++call_then_only_once;
+            });
+
+            p2.resolve(42);
+            REQUIRE(check_42_int == 42);
+            REQUIRE(call_then_only_once == 1);
+
+            p1.resolve(84);
+            REQUIRE(check_42_int == 42);
             REQUIRE(call_then_only_once == 1);
         }
     }
@@ -627,6 +673,26 @@ TEST_CASE("promise") {
             REQUIRE(call_fail_with_logic_error);
         }
     }
+    SECTION("make_any_promise_fail") {
+        REQUIRE_THROWS_AS(
+            pr::make_any_promise(std::vector<pr::promise<int>>{}),
+            std::logic_error);
+        {
+            bool call_fail_with_logic_error = false;
+            bool not_call_then_on_reject = true;
+            auto p = pr::make_any_promise(std::vector<pr::promise<int>>{
+                pr::make_rejected_promise<int>(std::logic_error("hello fail")),
+                pr::make_resolved_promise(10)
+            }).then([&not_call_then_on_reject](const int& c){
+                (void)c;
+                not_call_then_on_reject = false;
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+            REQUIRE(not_call_then_on_reject);
+            REQUIRE(call_fail_with_logic_error);
+        }
+    }
     SECTION("then_all") {
         {
             int check_42_int = 0;
@@ -636,7 +702,9 @@ TEST_CASE("promise") {
                     pr::make_resolved_promise(32),
                     pr::make_resolved_promise(10)};
             }).then([&check_42_int](const std::vector<int>& v){
-                check_42_int = std::accumulate(v.begin(), v.end(), 0);
+                if ( v.size() == 2) {
+                    check_42_int = v[0] + v[1];
+                }
             });
             REQUIRE(check_42_int == 42);
         }
@@ -650,10 +718,56 @@ TEST_CASE("promise") {
                     pr::make_resolved_promise(32),
                     pr::make_resolved_promise(10)};
             }).then([&check_42_int2](const std::vector<int>& v){
-                check_42_int2 = std::accumulate(v.begin(), v.end(), 0);
+                if ( v.size() == 2) {
+                    check_42_int2 = v[0] + v[1];
+                }
             });
             REQUIRE(check_42_int == 42);
             REQUIRE(check_42_int2 == 42);
+        }
+    }
+    SECTION("then_any") {
+        {
+            int check_42_int = 0;
+            pr::make_resolved_promise()
+            .then_any([](){
+                return std::vector<pr::promise<int>>{
+                    pr::make_resolved_promise(42),
+                    pr::make_rejected_promise<int>(std::logic_error("hello fail"))};
+            }).then([&check_42_int](const int& v){
+                check_42_int = v;
+            });
+            REQUIRE(check_42_int == 42);
+        }
+        {
+            bool call_fail_with_logic_error = false;
+            pr::make_resolved_promise()
+            .then_any([](){
+                return std::vector<pr::promise<int>>{
+                    pr::make_rejected_promise<int>(std::logic_error("hello fail")),
+                    pr::make_resolved_promise(42)};
+            }).fail([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+            REQUIRE(call_fail_with_logic_error);
+        }
+        {
+            int check_42_int = 0;
+            int check_42_int2 = 0;
+            int call_then_only_once = 0;
+            pr::make_resolved_promise(42)
+            .then_any([&check_42_int](int v){
+                check_42_int = v;
+                return std::vector<pr::promise<int>>{
+                    pr::make_resolved_promise(42),
+                    pr::make_resolved_promise(10)};
+            }).then([&call_then_only_once, &check_42_int2](const int& v){
+                ++call_then_only_once;
+                check_42_int2 = v;
+            });
+            REQUIRE(check_42_int == 42);
+            REQUIRE(check_42_int2 == 42);
+            REQUIRE(call_then_only_once == 1);
         }
     }
 }
