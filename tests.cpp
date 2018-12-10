@@ -104,6 +104,52 @@ TEST_CASE("is_promise_r") {
 }
 
 TEST_CASE("promise") {
+    SECTION("basic") {
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<int>();
+            REQUIRE_FALSE(p1 == p2);
+            REQUIRE(p1 != p2);
+
+            REQUIRE((p1 < p2 || p2 < p1));
+            REQUIRE(p1.hash() != p2.hash());
+            REQUIRE(p1.hash() == std::hash<pr::promise<int>>()(p1));
+        }
+        {
+            auto p1 = pr::promise<void>();
+            auto p2 = pr::promise<void>();
+            REQUIRE_FALSE(p1 == p2);
+            REQUIRE(p1 != p2);
+
+            REQUIRE((p1 < p2 || p2 < p1));
+            REQUIRE(p1.hash() != p2.hash());
+            REQUIRE(p1.hash() == std::hash<pr::promise<void>>()(p1));
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<int>();
+            auto p3 = p1;
+            REQUIRE(p1 == p3);
+            p3 = p2;
+            REQUIRE(p2 == p3);
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<int>();
+            auto p3 = p1;
+            p1.swap(p2);
+            REQUIRE(p2 == p3);
+            REQUIRE_FALSE(p1 == p3);
+        }
+        {
+            auto p1 = pr::promise<void>();
+            auto p2 = pr::promise<void>();
+            auto p3 = p1;
+            p1.swap(p2);
+            REQUIRE(p2 == p3);
+            REQUIRE_FALSE(p1 == p3);
+        }
+    }
     SECTION("resolved") {
         {
             int check_42_int = 0;
