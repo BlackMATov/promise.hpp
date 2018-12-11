@@ -901,10 +901,10 @@ TEST_CASE("get_and_wait") {
                 p.resolve();
             }};
             REQUIRE(p.wait_for(
-                std::chrono::milliseconds(1))
+                std::chrono::milliseconds(5))
                 == pr::promise_wait_status::timeout);
             REQUIRE(p.wait_for(
-                std::chrono::milliseconds(60))
+                std::chrono::milliseconds(90))
                 == pr::promise_wait_status::no_timeout);
         }
         {
@@ -914,10 +914,10 @@ TEST_CASE("get_and_wait") {
                 p.resolve();
             }};
             REQUIRE(p.wait_until(
-                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(1))
+                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(5))
                 == pr::promise_wait_status::timeout);
             REQUIRE(p.wait_until(
-                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(60))
+                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(90))
                 == pr::promise_wait_status::no_timeout);
         }
     }
@@ -954,10 +954,10 @@ TEST_CASE("get_and_wait") {
                 p.resolve(42);
             }};
             REQUIRE(p.wait_for(
-                std::chrono::milliseconds(1))
+                std::chrono::milliseconds(5))
                 == pr::promise_wait_status::timeout);
             REQUIRE(p.wait_for(
-                std::chrono::milliseconds(60))
+                std::chrono::milliseconds(90))
                 == pr::promise_wait_status::no_timeout);
             REQUIRE(p.get() == 42);
         }
@@ -968,10 +968,10 @@ TEST_CASE("get_and_wait") {
                 p.resolve(42);
             }};
             REQUIRE(p.wait_until(
-                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(1))
+                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(5))
                 == pr::promise_wait_status::timeout);
             REQUIRE(p.wait_until(
-                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(60))
+                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(90))
                 == pr::promise_wait_status::no_timeout);
             REQUIRE(p.get() == 42);
         }
