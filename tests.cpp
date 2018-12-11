@@ -897,27 +897,27 @@ TEST_CASE("get_and_wait") {
         {
             auto p = pr::promise<void>();
             auto_thread t{[p]() mutable {
-                std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 p.resolve();
             }};
             REQUIRE(p.wait_for(
-                std::chrono::milliseconds(1))
+                std::chrono::milliseconds(5))
                 == pr::promise_wait_status::timeout);
             REQUIRE(p.wait_for(
-                std::chrono::milliseconds(60))
+                std::chrono::milliseconds(200))
                 == pr::promise_wait_status::no_timeout);
         }
         {
             auto p = pr::promise<void>();
             auto_thread t{[p]() mutable {
-                std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 p.resolve();
             }};
             REQUIRE(p.wait_until(
-                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(1))
+                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(5))
                 == pr::promise_wait_status::timeout);
             REQUIRE(p.wait_until(
-                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(60))
+                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(200))
                 == pr::promise_wait_status::no_timeout);
         }
     }
@@ -950,28 +950,28 @@ TEST_CASE("get_and_wait") {
         {
             auto p = pr::promise<int>();
             auto_thread t{[p]() mutable {
-                std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 p.resolve(42);
             }};
             REQUIRE(p.wait_for(
-                std::chrono::milliseconds(1))
+                std::chrono::milliseconds(5))
                 == pr::promise_wait_status::timeout);
             REQUIRE(p.wait_for(
-                std::chrono::milliseconds(60))
+                std::chrono::milliseconds(200))
                 == pr::promise_wait_status::no_timeout);
             REQUIRE(p.get() == 42);
         }
         {
             auto p = pr::promise<int>();
             auto_thread t{[p]() mutable {
-                std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 p.resolve(42);
             }};
             REQUIRE(p.wait_until(
-                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(1))
+                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(5))
                 == pr::promise_wait_status::timeout);
             REQUIRE(p.wait_until(
-                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(60))
+                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(200))
                 == pr::promise_wait_status::no_timeout);
             REQUIRE(p.get() == 42);
         }
