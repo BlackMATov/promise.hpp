@@ -10,6 +10,7 @@
 #include "promise.hpp"
 namespace pr = promise_hpp;
 
+#include <thread>
 #include <cstring>
 
 namespace
@@ -36,6 +37,25 @@ namespace
             return false;
         }
     }
+
+    class auto_thread final {
+    public:
+        template < typename F, typename... Args >
+        auto_thread(F&& f, Args&&... args)
+        : thread_(std::forward<F>(f), std::forward<Args>(args)...) {}
+
+        ~auto_thread() noexcept {
+            if ( thread_.joinable() ) {
+                thread_.join();
+            }
+        }
+
+        void join() {
+            thread_.join();
+        }
+    private:
+        std::thread thread_;
+    };
 }
 
 TEST_CASE("is_promise") {
@@ -531,12 +551,10 @@ TEST_CASE("promise") {
         {
             bool call_fail_with_logic_error = false;
             auto p1 = pr::make_resolved_promise(42);
-            auto p2 = pr::make_resolved_promise(84);
 
-            p1.then([&p2](int v){
+            p1.then([](int v) -> pr::promise<int> {
                 (void)v;
                 throw std::logic_error("hello fail");
-                return p2;
             }).then([](int v2){
                 (void)v2;
             }).except([&call_fail_with_logic_error](std::exception_ptr e){
@@ -599,11 +617,9 @@ TEST_CASE("promise") {
         {
             bool call_fail_with_logic_error = false;
             auto p1 = pr::make_resolved_promise();
-            auto p2 = pr::make_resolved_promise();
 
-            p1.then([&p2](){
+            p1.then([]() -> pr::promise<void> {
                 throw std::logic_error("hello fail");
-                return p2;
             }).then([](){
             }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
@@ -847,6 +863,117 @@ TEST_CASE("promise") {
             REQUIRE(check_42_int == 42);
             REQUIRE(check_42_int2 == 42);
             REQUIRE(call_then_only_once == 1);
+        }
+    }
+}
+
+TEST_CASE("get_and_wait") {
+    SECTION("get_void_promises") {
+        {
+            auto p = pr::make_resolved_promise();
+            REQUIRE_NOTHROW(p.get());
+        }
+        {
+            auto p = pr::make_rejected_promise<void>(std::logic_error("hello fail"));
+            REQUIRE_THROWS_AS(p.get(), std::logic_error);
+        }
+        {
+            auto p = pr::promise<void>();
+            auto_thread t{[p]() mutable {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                p.resolve();
+            }};
+            t.join();
+            REQUIRE_NOTHROW(p.get());
+        }
+        {
+            auto p = pr::promise<void>();
+            auto_thread t{[p]() mutable {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                p.resolve();
+            }};
+            REQUIRE_NOTHROW(p.get());
+        }
+        {
+            auto p = pr::promise<void>();
+            auto_thread t{[p]() mutable {
+                std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                p.resolve();
+            }};
+            REQUIRE(p.wait_for(
+                std::chrono::milliseconds(1))
+                == pr::promise_wait_status::timeout);
+            REQUIRE(p.wait_for(
+                std::chrono::milliseconds(60))
+                == pr::promise_wait_status::no_timeout);
+        }
+        {
+            auto p = pr::promise<void>();
+            auto_thread t{[p]() mutable {
+                std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                p.resolve();
+            }};
+            REQUIRE(p.wait_until(
+                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(1))
+                == pr::promise_wait_status::timeout);
+            REQUIRE(p.wait_until(
+                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(60))
+                == pr::promise_wait_status::no_timeout);
+        }
+    }
+    SECTION("get_typed_promises") {
+        {
+            auto p = pr::make_resolved_promise(42);
+            REQUIRE(p.get() == 42);
+        }
+        {
+            auto p = pr::make_rejected_promise<int>(std::logic_error("hello fail"));
+            REQUIRE_THROWS_AS(p.get(), std::logic_error);
+        }
+        {
+            auto p = pr::promise<int>();
+            auto_thread t{[p]() mutable {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                p.resolve(42);
+            }};
+            t.join();
+            REQUIRE(p.get() == 42);
+        }
+        {
+            auto p = pr::promise<int>();
+            auto_thread t{[p]() mutable {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                p.resolve(42);
+            }};
+            REQUIRE(p.get() == 42);
+        }
+        {
+            auto p = pr::promise<int>();
+            auto_thread t{[p]() mutable {
+                std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                p.resolve(42);
+            }};
+            REQUIRE(p.wait_for(
+                std::chrono::milliseconds(1))
+                == pr::promise_wait_status::timeout);
+            REQUIRE(p.wait_for(
+                std::chrono::milliseconds(60))
+                == pr::promise_wait_status::no_timeout);
+            REQUIRE(p.get() == 42);
+        }
+        {
+            auto p = pr::promise<int>();
+            auto_thread t{[p]() mutable {
+                std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                p.resolve(42);
+            }};
+            REQUIRE(p.wait_until(
+                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(1))
+                == pr::promise_wait_status::timeout);
+            REQUIRE(p.wait_until(
+                std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(60))
+                == pr::promise_wait_status::no_timeout);
+            REQUIRE(p.get() == 42);
         }
     }
 }
