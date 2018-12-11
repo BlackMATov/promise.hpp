@@ -4,11 +4,13 @@
  * Copyright (C) 2018 Matvey Cherevko
  ******************************************************************************/
 
-#define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_FAST_COMPILE
 #include "catch.hpp"
 
 #include "promise.hpp"
 namespace pr = promise_hpp;
+
+#include <cstring>
 
 namespace
 {
