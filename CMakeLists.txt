@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 project(promise)
 
+find_package(Threads REQUIRED)
+
 file(GLOB test_sources "*.cpp" "*.hpp")
 add_executable(${PROJECT_NAME} ${test_sources})
+
+target_link_libraries(${PROJECT_NAME}
+    Threads::Threads)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
     CXX_STANDARD 14
