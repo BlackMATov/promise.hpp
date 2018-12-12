@@ -545,7 +545,7 @@ namespace promise_hpp
             return state_->get();
         }
 
-        void wait() const {
+        void wait() const noexcept {
             state_->wait();
         }
 
@@ -607,7 +607,7 @@ namespace promise_hpp
                 return storage_.value();
             }
 
-            void wait() const {
+            void wait() const noexcept {
                 std::unique_lock<std::mutex> lock(mutex_);
                 cond_var_.wait(lock, [this](){
                     return status_ != status::pending;
@@ -934,7 +934,7 @@ namespace promise_hpp
             state_->get();
         }
 
-        void wait() const {
+        void wait() const noexcept {
             state_->wait();
         }
 
@@ -993,7 +993,7 @@ namespace promise_hpp
                 assert(status_ == status::resolved);
             }
 
-            void wait() const {
+            void wait() const noexcept {
                 std::unique_lock<std::mutex> lock(mutex_);
                 cond_var_.wait(lock, [this](){
                     return status_ != status::pending;
