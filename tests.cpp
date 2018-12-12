@@ -7,12 +7,12 @@
 #define CATCH_CONFIG_FAST_COMPILE
 #include "catch.hpp"
 
-#include <cmath>
 #include <numeric>
 #include <cstring>
 
 #include "jobber.hpp"
 #include "promise.hpp"
+
 namespace jb = jobber_hpp;
 namespace pr = promise_hpp;
 
@@ -990,6 +990,16 @@ TEST_CASE("jobber") {
         REQUIRE_THROWS_AS(pv0.get(), std::exception);
     }
     {
+        auto pv0 = pr::promise<int>();
+        {
+            jb::jobber j{0};
+            pv0 = j.async([](){
+                return 42;
+            });
+        }
+        REQUIRE_THROWS_AS(pv0.get(), jb::jobber_cancelled_exception);
+    }
+    {
         int v5 = 5;
 
         jb::jobber j(1);
@@ -1015,13 +1025,14 @@ TEST_CASE("jobber") {
         REQUIRE(v5 == 4);
     }
     {
+        const float pi = 3.14159265358979323846264338327950288f;
         jb::jobber j(1);
         auto p0 = j.async([](float angle){
             return std::sin(angle);
-        }, M_PI);
+        }, pi);
         auto p1 = j.async([](float angle){
             return std::cos(angle);
-        }, M_PI * 2);
+        }, pi * 2);
         REQUIRE(p0.get() == Approx(0.f).margin(0.01f));
         REQUIRE(p1.get() == Approx(1.f).margin(0.01f));
     }

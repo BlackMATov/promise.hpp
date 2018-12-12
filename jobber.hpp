@@ -17,7 +17,8 @@
 #include <memory>
 #include <vector>
 #include <utility>
-#include <algorithm>
+#include <exception>
+#include <stdexcept>
 #include <type_traits>
 #include <condition_variable>
 
@@ -39,6 +40,12 @@ namespace jobber_hpp
         no_timeout,
         cancelled,
         timeout
+    };
+
+    class jobber_cancelled_exception : public std::runtime_error {
+    public:
+        jobber_cancelled_exception()
+        : std::runtime_error("jobber has stopped working") {}
     };
 
     class jobber final : private detail::noncopyable {
@@ -106,6 +113,7 @@ namespace jobber_hpp
     public:
         virtual ~task() noexcept = default;
         virtual void run() noexcept = 0;
+        virtual void cancel() noexcept = 0;
     };
 
     template < typename R, typename F, typename... Args >
@@ -117,7 +125,8 @@ namespace jobber_hpp
         template < typename U >
         concrete_task(U&& u, std::tuple<Args...>&& args);
         void run() noexcept final;
-        promise<R> promise() noexcept;
+        void cancel() noexcept final;
+        promise<R> future() noexcept;
     };
 
     template < typename F, typename... Args >
@@ -129,7 +138,8 @@ namespace jobber_hpp
         template < typename U >
         concrete_task(U&& u, std::tuple<Args...>&& args);
         void run() noexcept final;
-        promise<void> promise() noexcept;
+        void cancel() noexcept final;
+        promise<void> future() noexcept;
     };
 }
 
@@ -137,7 +147,7 @@ namespace jobber_hpp
 {
     inline jobber::jobber(std::size_t threads) {
         try {
-            threads_.resize(std::max<std::size_t>(1u, threads));
+            threads_.resize(threads);
             for ( std::thread& thread : threads_ ) {
                 thread = std::thread(&jobber::worker_main_, this);
             }
@@ -168,10 +178,10 @@ namespace jobber_hpp
         std::unique_ptr<task_t> task = std::make_unique<task_t>(
             std::forward<F>(f),
             std::make_tuple(std::forward<Args>(args)...));
-        promise<R> promise = task->promise();
+        promise<R> future = task->future();
         std::lock_guard<std::mutex> guard(tasks_mutex_);
         push_task_(priority, std::move(task));
-        return promise;
+        return future;
     }
 
     inline void jobber::pause() noexcept {
@@ -283,6 +293,13 @@ namespace jobber_hpp
     inline void jobber::shutdown_() noexcept {
         {
             std::lock_guard<std::mutex> guard(tasks_mutex_);
+            while ( !tasks_.empty() ) {
+                task_ptr task = pop_task_();
+                if ( task ) {
+                    task->cancel();
+                    --active_task_count_;
+                }
+            }
             cancelled_.store(true);
             cond_var_.notify_all();
         }
@@ -341,7 +358,12 @@ namespace jobber_hpp
     }
 
     template < typename R, typename F, typename... Args >
-    promise<R> jobber::concrete_task<R, F, Args...>::promise() noexcept {
+    void jobber::concrete_task<R, F, Args...>::cancel() noexcept {
+        promise_.reject(jobber_cancelled_exception());
+    }
+
+    template < typename R, typename F, typename... Args >
+    promise<R> jobber::concrete_task<R, F, Args...>::future() noexcept {
         return promise_;
     }
 
@@ -366,7 +388,12 @@ namespace jobber_hpp
     }
 
     template < typename F, typename... Args >
-    promise<void> jobber::concrete_task<void, F, Args...>::promise() noexcept {
+    void jobber::concrete_task<void, F, Args...>::cancel() noexcept {
+        promise_.reject(jobber_cancelled_exception());
+    }
+
+    template < typename F, typename... Args >
+    promise<void> jobber::concrete_task<void, F, Args...>::future() noexcept {
         return promise_;
     }
 }
