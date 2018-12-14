@@ -297,6 +297,14 @@ namespace promise_hpp
             return state_->get();
         }
 
+        const T& get_or_default(const T& def) const noexcept {
+            try {
+                return get();
+            } catch (...) {
+                return def;
+            }
+        }
+
         void wait() const noexcept {
             state_->wait();
         }
@@ -678,6 +686,14 @@ namespace promise_hpp
 
         void get() const {
             state_->get();
+        }
+
+        void get_or_default() const noexcept {
+            try {
+                return get();
+            } catch (...) {
+                // nothing
+            }
         }
 
         void wait() const noexcept {
