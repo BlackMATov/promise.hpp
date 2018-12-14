@@ -998,6 +998,40 @@ TEST_CASE("get_and_wait") {
             REQUIRE(p.get() == 42);
         }
     }
+    SECTION("get_or_default") {
+        {
+            auto p = pr::make_resolved_promise(42);
+            REQUIRE(p.get_or_default(84) == 42);
+        }
+        {
+            auto p = pr::make_rejected_promise<int>(std::logic_error("hello fail"));
+            REQUIRE(p.get_or_default(84) == 84);
+        }
+        {
+            auto p = pr::promise<int>();
+            auto_thread t{[p]() mutable {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                p.resolve(42);
+            }};
+            REQUIRE(p.get_or_default(84) == 42);
+        }
+        {
+            auto p = pr::promise<int>();
+            auto_thread t{[p]() mutable {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                p.reject(std::logic_error("hello fail"));
+            }};
+            REQUIRE(p.get_or_default(84) == 84);
+        }
+        {
+            auto p = pr::make_resolved_promise();
+            REQUIRE_NOTHROW(p.get_or_default());
+        }
+        {
+            auto p = pr::make_rejected_promise<void>(std::logic_error("hello fail"));
+            REQUIRE_NOTHROW(p.get_or_default());
+        }
+    }
 }
 
 TEST_CASE("promise_transformations") {
