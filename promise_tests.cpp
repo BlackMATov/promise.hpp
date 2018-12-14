@@ -404,7 +404,7 @@ TEST_CASE("promise") {
             }, [](std::exception_ptr){
                 throw std::logic_error("hello fail2");
             }).except([&call_fail_with_logic_error](std::exception_ptr e){
-                call_fail_with_logic_error = check_hello_fail2_exception(e);
+                call_fail_with_logic_error = check_hello_fail_exception(e);
             });
             REQUIRE(not_call_then_on_reject);
             REQUIRE(call_fail_with_logic_error);
@@ -768,6 +768,27 @@ TEST_CASE("promise") {
             REQUIRE(not_call_then_on_reject);
             REQUIRE(call_fail_with_logic_error);
         }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<int>();
+
+            int call_then_count = 0;
+            int call_except_count = 0;
+            pr::make_all_promise(std::vector<pr::promise<int>>{p1, p2})
+            .then([&call_then_count](const std::vector<int>& c){
+                (void)c;
+                ++call_then_count;
+            }, [&call_except_count](std::exception_ptr){
+                ++call_except_count;
+            });
+
+            p1.resolve(1);
+            REQUIRE(call_then_count == 0);
+            REQUIRE(call_except_count == 0);
+            p2.reject(std::logic_error("hello fail"));
+            REQUIRE(call_then_count == 0);
+            REQUIRE(call_except_count == 1);
+        }
     }
     SECTION("make_any_promise_fail") {
         REQUIRE_THROWS_AS(
@@ -975,6 +996,72 @@ TEST_CASE("get_and_wait") {
                 std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(200))
                 == pr::promise_wait_status::no_timeout);
             REQUIRE(p.get() == 42);
+        }
+    }
+}
+
+TEST_CASE("promise_transformations") {
+    {
+        auto p_v = pr::promise<int>()
+            .then([](int){});
+        static_assert(
+            std::is_same<decltype(p_v)::value_type, void>::value,
+            "unit test fail");
+
+        auto p_f = pr::promise<int>()
+            .then([](int){return 1.f;});
+        static_assert(
+            std::is_same<decltype(p_f)::value_type, float>::value,
+            "unit test fail");
+
+        auto p_d = pr::promise<int>()
+            .then([](int){return 1.f;})
+            .then([](float){return 1.0;});
+        static_assert(
+            std::is_same<decltype(p_d)::value_type, double>::value,
+            "unit test fail");
+    }
+    {
+        auto p_v = pr::promise<void>()
+            .then([](){});
+        static_assert(
+            std::is_same<decltype(p_v)::value_type, void>::value,
+            "unit test fail");
+
+        auto p_f = pr::promise<void>()
+            .then([](){return 1.f;});
+        static_assert(
+            std::is_same<decltype(p_f)::value_type, float>::value,
+            "unit test fail");
+
+        auto p_d = pr::promise<void>()
+            .then([](){return 1.f;})
+            .then([](float){return 1.0;});
+        static_assert(
+            std::is_same<decltype(p_d)::value_type, double>::value,
+            "unit test fail");
+    }
+    SECTION("after_except") {
+        {
+            auto p_v = pr::promise<int>()
+                .then([](int)->int{
+                    throw std::logic_error("hello fail");
+                })
+                .except([](std::exception_ptr){});
+            static_assert(
+                std::is_same<decltype(p_v)::value_type, int>::value,
+                "unit test fail");
+        }
+        {
+            auto p_v = pr::promise<int>()
+                .then([](int)->int{
+                    throw std::logic_error("hello fail");
+                })
+                .except([](std::exception_ptr){
+                });
+            static_assert(
+                std::is_same<decltype(p_v)::value_type, int>::value,
+                "unit test fail");
         }
     }
 }
