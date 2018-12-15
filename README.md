@@ -22,7 +22,7 @@
 
 ## Installation
 
-[promise.hpp][promise] is a header only library. All you need to do is copy the header files (invoke.hpp and promise.hpp) into your project and include this file:
+[promise.hpp][promise] is a header only library. All you need to do is copy the header files (`invoke.hpp` and `promise.hpp`) into your project and include this file:
 
 ```cpp
 #include "promise.hpp"
