@@ -29,16 +29,6 @@ namespace
         }
     }
 
-    bool check_hello_fail2_exception(std::exception_ptr e) {
-        try {
-            std::rethrow_exception(e);
-        } catch (std::logic_error& ee) {
-            return 0 == std::strcmp(ee.what(), "hello fail2");
-        } catch (...) {
-            return false;
-        }
-    }
-
     class auto_thread final {
     public:
         template < typename F, typename... Args >
@@ -709,6 +699,20 @@ TEST_CASE("promise") {
 
             REQUIRE(call_then_only_once == 1);
         }
+        {
+            class o_t {
+            public:
+                o_t() = delete;
+                o_t(int) {}
+            };
+
+            pr::promise<>()
+            .then_all([](){
+                return std::vector<pr::promise<o_t>>{
+                    pr::make_resolved_promise<o_t>(40),
+                    pr::make_resolved_promise<o_t>(2)};
+            });
+        }
     }
     SECTION("make_any_promise") {
         {
@@ -750,6 +754,87 @@ TEST_CASE("promise") {
             p1.resolve(84);
             REQUIRE(check_42_int == 42);
             REQUIRE(call_then_only_once == 1);
+        }
+        {
+            class o_t {
+            public:
+                o_t() = delete;
+                o_t(int) {}
+            };
+
+            pr::promise<>()
+            .then_any([](){
+                return std::vector<pr::promise<o_t>>{
+                    pr::make_resolved_promise<o_t>(40),
+                    pr::make_resolved_promise<o_t>(2)};
+            });
+        }
+    }
+    SECTION("make_tuple_promise") {
+        {
+            static_assert(
+                std::is_same<
+                    pr::impl::tuple_promise_result_t<std::tuple<>>,
+                    std::tuple<>>::value,
+                "unit test fail");
+            static_assert(
+                std::is_same<
+                    pr::impl::tuple_promise_result_t<std::tuple<pr::promise<int>>>,
+                    std::tuple<int>>::value,
+                "unit test fail");
+            static_assert(
+                std::is_same<
+                    pr::impl::tuple_promise_result_t<std::tuple<pr::promise<int>, pr::promise<float>>>,
+                    std::tuple<int, float>>::value,
+                "unit test fail");
+        }
+        {
+            auto p = pr::make_tuple_promise(std::make_tuple());
+            REQUIRE(p.get() == std::make_tuple());
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::make_tuple_promise(std::make_tuple(p1));
+            p1.resolve(42);
+            REQUIRE(p2.get_or_default(std::make_tuple(0)) == std::make_tuple(42));
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto t0 = std::make_tuple(p1);
+            auto p2 = pr::make_tuple_promise(t0);
+            p1.resolve(42);
+            REQUIRE(p2.get_or_default(std::make_tuple(0)) == std::make_tuple(42));
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<float>();
+            auto p3 = pr::make_tuple_promise(std::make_tuple(p1, p2));
+            p1.resolve(42);
+            p2.resolve(4.2f);
+            REQUIRE(p3.get_or_default(std::make_tuple(0, 0.f)) == std::make_tuple(42, 4.2f));
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<float>();
+            auto p3 = pr::promise<int>();
+            auto p4 = pr::make_tuple_promise(std::make_tuple(p1, p2, p3));
+            p1.resolve(42);
+            p2.resolve(4.2f);
+            p3.resolve(84);
+            REQUIRE(p4.get_or_default(std::make_tuple(0, 0.f, 0)) == std::make_tuple(42, 4.2f, 84));
+        }
+        {
+            class o_t {
+            public:
+                o_t() = delete;
+            };
+
+            pr::promise<>()
+            .then_tuple([](){
+                auto p1 = pr::promise<o_t>();
+                auto p2 = pr::promise<o_t>();
+                return std::make_tuple(std::move(p1), std::move(p2));
+            });
         }
     }
     SECTION("make_all_promise_fail") {
@@ -808,6 +893,44 @@ TEST_CASE("promise") {
             });
             REQUIRE(not_call_then_on_reject);
             REQUIRE(call_fail_with_logic_error);
+        }
+    }
+    SECTION("make_tuple_promise_fail") {
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::make_tuple_promise(std::make_tuple(p1));
+            p1.reject(std::logic_error("hello failt"));
+            REQUIRE_THROWS_AS(p2.get(), std::logic_error);
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<float>();
+            auto p3 = pr::make_tuple_promise(std::make_tuple(p1, p2));
+            p1.resolve(42);
+            p2.reject(std::logic_error("hello failt"));
+            REQUIRE_THROWS_AS(p3.get(), std::logic_error);
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<float>();
+            auto p3 = pr::make_tuple_promise(std::make_tuple(p1, p2));
+            p1.reject(std::logic_error("hello failt"));
+            p2.resolve(4.2f);
+            REQUIRE_THROWS_AS(p3.get(), std::logic_error);
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<float>();
+            auto p3 = pr::make_tuple_promise(std::make_tuple(p1, p2));
+            p1.reject(std::logic_error("hello failt"));
+            REQUIRE_THROWS_AS(p3.get(), std::logic_error);
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<float>();
+            auto p3 = pr::make_tuple_promise(std::make_tuple(p1, p2));
+            p2.reject(std::logic_error("hello failt"));
+            REQUIRE_THROWS_AS(p3.get(), std::logic_error);
         }
     }
     SECTION("then_all") {
@@ -885,6 +1008,44 @@ TEST_CASE("promise") {
             REQUIRE(check_42_int == 42);
             REQUIRE(check_42_int2 == 42);
             REQUIRE(call_then_only_once == 1);
+        }
+    }
+    SECTION("then_tuple") {
+        {
+            float check_42_float = 0.f;
+            pr::make_resolved_promise()
+            .then_tuple([](){
+                return std::make_tuple(
+                    pr::make_resolved_promise(32),
+                    pr::make_resolved_promise(10.f));
+            }).then([&check_42_float](const std::tuple<int, float>& t){
+                check_42_float = std::get<0>(t) + std::get<1>(t);
+            });
+            REQUIRE(check_42_float == Approx(42.f).margin(0.01f));
+        }
+        {
+            float check_42_float = 0.f;
+            pr::make_resolved_promise(42)
+            .then_tuple([](int){
+                return std::make_tuple(
+                    pr::make_resolved_promise(32),
+                    pr::make_resolved_promise(10.f));
+            }).then([&check_42_float](const std::tuple<int, float>& t){
+                check_42_float = std::get<0>(t) + std::get<1>(t);
+            });
+            REQUIRE(check_42_float == Approx(42.f).margin(0.01f));
+        }
+        {
+            bool call_fail_with_logic_error = false;
+            pr::make_resolved_promise(42)
+            .then_tuple([](int){
+                return std::make_tuple(
+                    pr::make_resolved_promise(32),
+                    pr::make_rejected_promise<float>(std::logic_error("hello fail")));
+            }).except([&call_fail_with_logic_error](std::exception_ptr e){
+                call_fail_with_logic_error = check_hello_fail_exception(e);
+            });
+            REQUIRE(call_fail_with_logic_error);
         }
     }
 }

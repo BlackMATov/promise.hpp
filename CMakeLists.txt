@@ -6,6 +6,10 @@ find_package(Threads REQUIRED)
 file(GLOB test_sources "*.cpp" "*.hpp")
 add_executable(${PROJECT_NAME} ${test_sources})
 
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /bigobj)
+endif(MSVC)
+
 target_link_libraries(${PROJECT_NAME}
     Threads::Threads)
 
