@@ -38,13 +38,20 @@ TEST_CASE("scheduler") {
         int counter = 0;
         s.schedule([&counter](){ ++counter; });
         REQUIRE(counter == 0);
-        s.process_all_tasks();
+        REQUIRE(s.process_all_tasks() == std::make_pair(
+            sd::scheduler_processing_status::done,
+            std::size_t(1u)));
         REQUIRE(counter == 1);
         s.schedule([&counter](){ ++counter; });
         s.schedule([&counter](){ ++counter; });
         REQUIRE(counter == 1);
-        s.process_all_tasks();
+        REQUIRE(s.process_all_tasks() == std::make_pair(
+            sd::scheduler_processing_status::done,
+            std::size_t(2u)));
         REQUIRE(counter == 3);
+        REQUIRE(s.process_all_tasks() == std::make_pair(
+            sd::scheduler_processing_status::done,
+            std::size_t(0u)));
     }
     {
         sd::scheduler s;
@@ -53,13 +60,21 @@ TEST_CASE("scheduler") {
         s.schedule([&counter](){ ++counter; });
         s.schedule([&counter](){ ++counter; });
         REQUIRE(counter == 0);
-        REQUIRE(s.process_one_task());
+        REQUIRE(s.process_one_task() == std::make_pair(
+            sd::scheduler_processing_status::done,
+            std::size_t(1u)));
         REQUIRE(counter == 1);
-        REQUIRE(s.process_one_task());
+        REQUIRE(s.process_one_task() == std::make_pair(
+            sd::scheduler_processing_status::done,
+            std::size_t(1u)));
         REQUIRE(counter == 2);
-        REQUIRE(s.process_one_task());
+        REQUIRE(s.process_one_task() == std::make_pair(
+            sd::scheduler_processing_status::done,
+            std::size_t(1u)));
         REQUIRE(counter == 3);
-        REQUIRE_FALSE(s.process_one_task());
+        REQUIRE(s.process_one_task() == std::make_pair(
+            sd::scheduler_processing_status::done,
+            std::size_t(0u)));
         REQUIRE(counter == 3);
     }
     {
@@ -71,14 +86,28 @@ TEST_CASE("scheduler") {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             });
         }
-        s.process_tasks_for(std::chrono::milliseconds(-1));
-        s.process_tasks_for(std::chrono::milliseconds(0));
+        REQUIRE(s.process_tasks_for(std::chrono::milliseconds(-1)) == std::make_pair(
+            sd::scheduler_processing_status::timeout,
+            std::size_t(0u)));
+        REQUIRE(s.process_tasks_for(std::chrono::milliseconds(0)) == std::make_pair(
+            sd::scheduler_processing_status::timeout,
+            std::size_t(0u)));
         REQUIRE(counter == 0);
-        s.process_tasks_for(std::chrono::milliseconds(100));
-        REQUIRE(counter > 2);
-        REQUIRE(counter < 50);
-        s.process_tasks_for(std::chrono::seconds(3));
-        REQUIRE(counter == 50);
+        {
+            auto r = s.process_tasks_for(std::chrono::milliseconds(100));
+            REQUIRE(r.first == sd::scheduler_processing_status::timeout);
+            REQUIRE(r.second > 2);
+            REQUIRE(r.second < 50);
+            REQUIRE(counter > 2);
+            REQUIRE(counter < 50);
+        }
+        {
+            auto r = s.process_tasks_for(std::chrono::seconds(3));
+            REQUIRE(r.first == sd::scheduler_processing_status::done);
+            REQUIRE(r.second > 0);
+            REQUIRE(r.second < 50);
+            REQUIRE(counter == 50);
+        }
     }
     {
         sd::scheduler s;
@@ -96,15 +125,29 @@ TEST_CASE("scheduler") {
 
         const auto b = time_now();
 
-        s.process_tasks_until(time_now() - std::chrono::milliseconds(1));
-        s.process_tasks_until(time_now());
+        REQUIRE(s.process_tasks_until(time_now() - std::chrono::milliseconds(1)) == std::make_pair(
+            sd::scheduler_processing_status::timeout,
+            std::size_t(0u)));
+        REQUIRE(s.process_tasks_until(time_now()) == std::make_pair(
+            sd::scheduler_processing_status::timeout,
+            std::size_t(0u)));
         REQUIRE(counter == 0);
-        s.process_tasks_until(time_now() + std::chrono::milliseconds(100));
-        REQUIRE(time_now() - b > std::chrono::milliseconds(50));
-        REQUIRE(counter > 2);
-        REQUIRE(counter < 50);
-        s.process_tasks_until(time_now() + std::chrono::seconds(3));
-        REQUIRE(counter == 50);
+        {
+            auto r = s.process_tasks_until(time_now() + std::chrono::milliseconds(100));
+            REQUIRE(time_now() - b > std::chrono::milliseconds(50));
+            REQUIRE(r.first == sd::scheduler_processing_status::timeout);
+            REQUIRE(r.second > 2);
+            REQUIRE(r.second < 50);
+            REQUIRE(counter > 2);
+            REQUIRE(counter < 50);
+        }
+        {
+            auto r = s.process_tasks_until(time_now() + std::chrono::seconds(3));
+            REQUIRE(r.first == sd::scheduler_processing_status::done);
+            REQUIRE(r.second > 0);
+            REQUIRE(r.second < 50);
+            REQUIRE(counter == 50);
+        }
     }
     {
         sd::scheduler s;
@@ -124,7 +167,9 @@ TEST_CASE("scheduler") {
         s.schedule(sd::scheduler_priority::normal, [](std::string& acc){
             acc.append("l");
         }, std::ref(accumulator));
-        s.process_all_tasks();
+        REQUIRE(s.process_all_tasks() == std::make_pair(
+            sd::scheduler_processing_status::done,
+            std::size_t(5u)));
         REQUIRE(accumulator == "hello");
     }
 }
