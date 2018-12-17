@@ -49,6 +49,22 @@ TEST_CASE("scheduler") {
     {
         sd::scheduler s;
         int counter = 0;
+        s.schedule([&counter](){ ++counter; });
+        s.schedule([&counter](){ ++counter; });
+        s.schedule([&counter](){ ++counter; });
+        REQUIRE(counter == 0);
+        REQUIRE(s.process_one_task());
+        REQUIRE(counter == 1);
+        REQUIRE(s.process_one_task());
+        REQUIRE(counter == 2);
+        REQUIRE(s.process_one_task());
+        REQUIRE(counter == 3);
+        REQUIRE_FALSE(s.process_one_task());
+        REQUIRE(counter == 3);
+    }
+    {
+        sd::scheduler s;
+        int counter = 0;
         for ( std::size_t i = 0; i < 50; ++i ) {
             s.schedule([&counter](){
                 ++counter;

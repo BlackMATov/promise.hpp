@@ -65,6 +65,7 @@ namespace scheduler_hpp
                  , typename R = schedule_invoke_result_t<F, Args...> >
         promise<R> schedule(scheduler_priority scheduler_priority, F&& f, Args&&... args);
 
+        bool process_one_task() noexcept;
         scheduler_wait_status process_all_tasks() noexcept;
 
         template < typename Rep, typename Period >
@@ -157,6 +158,15 @@ namespace scheduler_hpp
         return future;
     }
 
+    inline bool scheduler::process_one_task() noexcept {
+        std::unique_lock<std::mutex> lock(tasks_mutex_);
+        if ( tasks_.empty() ) {
+            return false;
+        }
+        process_task_(std::move(lock));
+        return true;
+    }
+
     inline scheduler_wait_status scheduler::process_all_tasks() noexcept {
         while ( !cancelled_ && active_task_count_ ) {
             std::unique_lock<std::mutex> lock(tasks_mutex_);
@@ -237,6 +247,7 @@ namespace scheduler_hpp
         if ( task ) {
             lock.unlock();
             task->run();
+            lock.lock();
             --active_task_count_;
             cond_var_.notify_all();
         }
