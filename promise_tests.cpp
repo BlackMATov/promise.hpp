@@ -1039,7 +1039,7 @@ TEST_CASE("promise") {
                     pr::make_rejected_promise<float>(std::logic_error("hello fail")));
             }).except([&call_fail_with_logic_error](std::exception_ptr e){
                 call_fail_with_logic_error = check_hello_fail_exception(e);
-                return 0;
+                return std::make_tuple(0, 0.f);
             });
             REQUIRE(call_fail_with_logic_error);
         }
