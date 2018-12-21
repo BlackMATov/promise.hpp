@@ -72,6 +72,7 @@ namespace jobber_hpp
 
         jobber_wait_status wait_all() const noexcept;
         jobber_wait_status active_wait_all() noexcept;
+        jobber_wait_status active_wait_one() noexcept;
 
         template < typename Rep, typename Period >
         jobber_wait_status wait_all_for(
@@ -223,6 +224,17 @@ namespace jobber_hpp
         return cancelled_
             ? jobber_wait_status::cancelled
             : jobber_wait_status::no_timeout;
+    }
+
+    inline jobber_wait_status jobber::active_wait_one() noexcept {
+        std::unique_lock<std::mutex> lock(tasks_mutex_);
+        if ( cancelled_ ) {
+            return jobber_wait_status::cancelled;
+        }
+        if ( !tasks_.empty() ) {
+            process_task_(std::move(lock));
+        }
+        return jobber_wait_status::no_timeout;
     }
 
     template < typename Rep, typename Period >

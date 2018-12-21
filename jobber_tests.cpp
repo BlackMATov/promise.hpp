@@ -119,6 +119,29 @@ TEST_CASE("jobber") {
     }
     {
         jb::jobber j(1);
+        std::atomic<int> counter = ATOMIC_VAR_INIT(0);
+        j.pause();
+        for ( std::size_t i = 0; i < 3; ++i ) {
+            j.async([&counter](){
+                ++counter;
+            });
+        }
+        REQUIRE(counter == 0);
+        REQUIRE(j.active_wait_one() == jb::jobber_wait_status::no_timeout);
+        REQUIRE(counter == 1);
+        REQUIRE(j.active_wait_one() == jb::jobber_wait_status::no_timeout);
+        REQUIRE(counter == 2);
+        REQUIRE(j.active_wait_one() == jb::jobber_wait_status::no_timeout);
+        REQUIRE(counter == 3);
+        REQUIRE(j.active_wait_one() == jb::jobber_wait_status::no_timeout);
+        REQUIRE(counter == 3);
+        j.resume();
+        REQUIRE(j.wait_all() == jb::jobber_wait_status::no_timeout);
+        REQUIRE(j.active_wait_one() == jb::jobber_wait_status::no_timeout);
+        REQUIRE(counter == 3);
+    }
+    {
+        jb::jobber j(1);
 
         const auto time_now = [](){
             return std::chrono::high_resolution_clock::now();
