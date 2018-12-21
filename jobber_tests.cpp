@@ -127,17 +127,33 @@ TEST_CASE("jobber") {
             });
         }
         REQUIRE(counter == 0);
-        REQUIRE(j.active_wait_one() == jb::jobber_wait_status::no_timeout);
+        {
+            auto r = j.active_wait_one();
+            REQUIRE(r.first == jb::jobber_wait_status::no_timeout);
+            REQUIRE(r.second == 1);
+        }
         REQUIRE(counter == 1);
-        REQUIRE(j.active_wait_one() == jb::jobber_wait_status::no_timeout);
+        {
+            auto r = j.active_wait_one();
+            REQUIRE(r.first == jb::jobber_wait_status::no_timeout);
+            REQUIRE(r.second == 1);
+        }
         REQUIRE(counter == 2);
-        REQUIRE(j.active_wait_one() == jb::jobber_wait_status::no_timeout);
+        {
+            auto r = j.active_wait_one();
+            REQUIRE(r.first == jb::jobber_wait_status::no_timeout);
+            REQUIRE(r.second == 1);
+        }
         REQUIRE(counter == 3);
-        REQUIRE(j.active_wait_one() == jb::jobber_wait_status::no_timeout);
+        {
+            auto r = j.active_wait_one();
+            REQUIRE(r.first == jb::jobber_wait_status::no_timeout);
+            REQUIRE(r.second == 0);
+        }
         REQUIRE(counter == 3);
         j.resume();
         REQUIRE(j.wait_all() == jb::jobber_wait_status::no_timeout);
-        REQUIRE(j.active_wait_one() == jb::jobber_wait_status::no_timeout);
+        REQUIRE(j.active_wait_one().first == jb::jobber_wait_status::no_timeout);
         REQUIRE(counter == 3);
     }
     {
@@ -149,16 +165,16 @@ TEST_CASE("jobber") {
 
         REQUIRE(jb::jobber_wait_status::no_timeout == j.wait_all_for(std::chrono::milliseconds(-1)));
         REQUIRE(jb::jobber_wait_status::no_timeout == j.wait_all_until(time_now() + std::chrono::milliseconds(-1)));
-        REQUIRE(jb::jobber_wait_status::no_timeout == j.active_wait_all_for(std::chrono::milliseconds(-1)));
-        REQUIRE(jb::jobber_wait_status::no_timeout == j.active_wait_all_until(time_now() + std::chrono::milliseconds(-1)));
+        REQUIRE(jb::jobber_wait_status::no_timeout == j.active_wait_all_for(std::chrono::milliseconds(-1)).first);
+        REQUIRE(jb::jobber_wait_status::no_timeout == j.active_wait_all_until(time_now() + std::chrono::milliseconds(-1)).first);
 
         j.pause();
         j.async([]{});
 
         REQUIRE(jb::jobber_wait_status::timeout == j.wait_all_for(std::chrono::milliseconds(-1)));
         REQUIRE(jb::jobber_wait_status::timeout == j.wait_all_until(time_now() + std::chrono::milliseconds(-1)));
-        REQUIRE(jb::jobber_wait_status::timeout == j.active_wait_all_for(std::chrono::milliseconds(-1)));
-        REQUIRE(jb::jobber_wait_status::timeout == j.active_wait_all_until(time_now() + std::chrono::milliseconds(-1)));
+        REQUIRE(jb::jobber_wait_status::timeout == j.active_wait_all_for(std::chrono::milliseconds(-1)).first);
+        REQUIRE(jb::jobber_wait_status::timeout == j.active_wait_all_until(time_now() + std::chrono::milliseconds(-1)).first);
     }
     {
         jb::jobber j(1);
@@ -267,9 +283,18 @@ TEST_CASE("jobber") {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             });
         }
-        REQUIRE(jb::jobber_wait_status::timeout == j.active_wait_all_for(std::chrono::milliseconds(50)));
+        {
+            auto r = j.active_wait_all_for(std::chrono::milliseconds(50));
+            REQUIRE(jb::jobber_wait_status::timeout == r.first);
+            REQUIRE(r.second > 0);
+        }
         REQUIRE(counter > 0);
-        REQUIRE(jb::jobber_wait_status::no_timeout == j.active_wait_all_for(std::chrono::seconds(5)));
+        {
+            auto r = j.active_wait_all_for(std::chrono::seconds(3));
+            REQUIRE(jb::jobber_wait_status::no_timeout == r.first);
+            REQUIRE(r.second > 0);
+            REQUIRE(r.second < 30);
+        }
         REQUIRE(counter == 30);
     }
     {
