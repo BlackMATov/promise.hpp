@@ -25,10 +25,17 @@
 
 ## Installation
 
-[promise.hpp][promise] is a header only library. All you need to do is copy the header files (`invoke.hpp` and `promise.hpp`) into your project and include this file:
+[promise.hpp][promise] is a header-only library. All you need to do is copy the headers files from `headers` directory into your project and include them:
 
 ```cpp
-#include "promise.hpp"
+#include "promise.hpp/promise.hpp"
+```
+
+Also, you can add the root repository directory to your [cmake](https://cmake.org) project:
+
+```cmake
+add_subdirectory(external/promise.hpp)
+target_link_libraries(your_project_target promise.hpp)
 ```
 
 ## Examples
