@@ -5,13 +5,13 @@
  ******************************************************************************/
 
 #define CATCH_CONFIG_FAST_COMPILE
-#include "catch.hpp"
+#include <catch2/catch.hpp>
 
 #include <thread>
 #include <numeric>
 #include <cstring>
 
-#include "promise.hpp"
+#include <promise.hpp/promise.hpp>
 namespace pr = promise_hpp;
 
 namespace

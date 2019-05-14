@@ -5,13 +5,13 @@
  ******************************************************************************/
 
 #define CATCH_CONFIG_FAST_COMPILE
-#include "catch.hpp"
+#include <catch2/catch.hpp>
 
 #include <thread>
 #include <numeric>
 #include <cstring>
 
-#include "jobber.hpp"
+#include <promise.hpp/jobber.hpp>
 namespace jb = jobber_hpp;
 
 TEST_CASE("jobber") {
