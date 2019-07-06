@@ -328,11 +328,12 @@ namespace promise_hpp
             return state_->get();
         }
 
-        const T& get_or_default(const T& def) const noexcept {
+        template < typename U >
+        T get_or_default(U&& def) const {
             try {
                 return get();
             } catch (...) {
-                return def;
+                return std::forward<U>(def);
             }
         }
 
@@ -757,7 +758,7 @@ namespace promise_hpp
             state_->get();
         }
 
-        void get_or_default() const noexcept {
+        void get_or_default() const {
             try {
                 return get();
             } catch (...) {
