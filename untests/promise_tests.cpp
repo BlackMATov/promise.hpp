@@ -708,14 +708,14 @@ TEST_CASE("promise") {
             });
         }
     }
-    SECTION("make_any_promise") {
+    SECTION("make_race_promise") {
         {
             auto p1 = pr::promise<int>();
             auto p2 = pr::promise<int>();
 
             int check_42_int = 0;
             int call_then_only_once = 0;
-            pr::make_any_promise(std::vector<pr::promise<int>>{p1, p2})
+            pr::make_race_promise(std::vector<pr::promise<int>>{p1, p2})
             .then([&check_42_int, &call_then_only_once](const int& v){
                 check_42_int = v;
                 ++call_then_only_once;
@@ -735,7 +735,7 @@ TEST_CASE("promise") {
 
             int check_42_int = 0;
             int call_then_only_once = 0;
-            pr::make_any_promise(std::vector<pr::promise<int>>{p1, p2})
+            pr::make_race_promise(std::vector<pr::promise<int>>{p1, p2})
             .then([&check_42_int, &call_then_only_once](const int& v){
                 check_42_int = v;
                 ++call_then_only_once;
@@ -757,7 +757,7 @@ TEST_CASE("promise") {
             };
 
             pr::promise<>()
-            .then_any([](){
+            .then_race([](){
                 return std::vector<pr::promise<o_t>>{
                     pr::make_resolved_promise<o_t>(40),
                     pr::make_resolved_promise<o_t>(2)};
@@ -869,14 +869,14 @@ TEST_CASE("promise") {
             REQUIRE(call_except_count == 1);
         }
     }
-    SECTION("make_any_promise_fail") {
+    SECTION("make_race_promise_fail") {
         REQUIRE_THROWS_AS(
-            pr::make_any_promise(std::vector<pr::promise<int>>{}),
+            pr::make_race_promise(std::vector<pr::promise<int>>{}),
             std::logic_error);
         {
             bool call_fail_with_logic_error = false;
             bool not_call_then_on_reject = true;
-            auto p = pr::make_any_promise(std::vector<pr::promise<int>>{
+            auto p = pr::make_race_promise(std::vector<pr::promise<int>>{
                 pr::make_rejected_promise<int>(std::logic_error("hello fail")),
                 pr::make_resolved_promise(10)
             }).then([&not_call_then_on_reject](const int& c){
@@ -960,11 +960,11 @@ TEST_CASE("promise") {
             REQUIRE(check_42_int2 == 42);
         }
     }
-    SECTION("then_any") {
+    SECTION("then_race") {
         {
             int check_42_int = 0;
             pr::make_resolved_promise()
-            .then_any([](){
+            .then_race([](){
                 return std::vector<pr::promise<int>>{
                     pr::make_resolved_promise(42),
                     pr::make_rejected_promise<int>(std::logic_error("hello fail"))};
@@ -976,7 +976,7 @@ TEST_CASE("promise") {
         {
             bool call_fail_with_logic_error = false;
             pr::make_resolved_promise()
-            .then_any([](){
+            .then_race([](){
                 return std::vector<pr::promise<int>>{
                     pr::make_rejected_promise<int>(std::logic_error("hello fail")),
                     pr::make_resolved_promise(42)};
@@ -991,7 +991,7 @@ TEST_CASE("promise") {
             int check_42_int2 = 0;
             int call_then_only_once = 0;
             pr::make_resolved_promise(42)
-            .then_any([&check_42_int](int v){
+            .then_race([&check_42_int](int v){
                 check_42_int = v;
                 return std::vector<pr::promise<int>>{
                     pr::make_resolved_promise(42),

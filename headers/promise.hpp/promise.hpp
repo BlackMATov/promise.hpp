@@ -246,14 +246,14 @@ namespace promise_hpp
         }
 
         template < typename ResolveF >
-        auto then_any(ResolveF&& on_resolve) {
+        auto then_race(ResolveF&& on_resolve) {
             return then([
                 f = std::forward<ResolveF>(on_resolve)
             ](auto&& v) mutable {
                 auto r = invoke_hpp::invoke(
                     std::forward<decltype(f)>(f),
                     std::forward<decltype(v)>(v));
-                return make_any_promise(std::move(r));
+                return make_race_promise(std::move(r));
             });
         }
 
@@ -679,13 +679,13 @@ namespace promise_hpp
         }
 
         template < typename ResolveF >
-        auto then_any(ResolveF&& on_resolve) {
+        auto then_race(ResolveF&& on_resolve) {
             return then([
                 f = std::forward<ResolveF>(on_resolve)
             ]() mutable {
                 auto r = invoke_hpp::invoke(
                     std::forward<decltype(f)>(f));
-                return make_any_promise(std::move(r));
+                return make_race_promise(std::move(r));
             });
         }
 
@@ -1145,15 +1145,15 @@ namespace promise_hpp
     }
 
     //
-    // make_any_promise
+    // make_race_promise
     //
 
     template < typename Iter
              , typename SubPromise = typename Iter::value_type
              , typename SubPromiseResult = typename SubPromise::value_type >
-    auto make_any_promise(Iter begin, Iter end) {
+    auto make_race_promise(Iter begin, Iter end) {
         if ( begin == end ) {
-            throw std::logic_error("at least one input promise must be provided for make_any_promise");
+            throw std::logic_error("at least one input promise must be provided for make_race_promise");
         }
         return make_promise<SubPromiseResult>([begin, end](auto&& resolver, auto&& rejector){
             for ( Iter iter = begin; iter != end; ++iter ) {
@@ -1165,8 +1165,8 @@ namespace promise_hpp
     }
 
     template < typename Container >
-    auto make_any_promise(Container&& container) {
-        return make_any_promise(
+    auto make_race_promise(Container&& container) {
+        return make_race_promise(
             std::begin(container),
             std::end(container));
     }
