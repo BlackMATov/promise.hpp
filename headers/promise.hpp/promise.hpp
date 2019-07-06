@@ -1270,11 +1270,12 @@ namespace promise_hpp
             try {
                 auto context = std::make_shared<tuple_promise_context_t<
                     std::tuple_element_t<Is, ResultTuple>...>>();
-                std::make_tuple(make_tuple_sub_promise_impl<Is>(
+                auto promises = std::make_tuple(make_tuple_sub_promise_impl<Is>(
                     tuple,
                     resolver,
                     rejector,
                     context)...);
+                (void)promises;
             } catch (...) {
                 result.reject(std::current_exception());
             }
