@@ -7,6 +7,7 @@
 #define CATCH_CONFIG_FAST_COMPILE
 #include <catch2/catch.hpp>
 
+#include <array>
 #include <thread>
 #include <numeric>
 #include <cstring>
@@ -694,6 +695,22 @@ TEST_CASE("promise") {
             REQUIRE(call_then_only_once == 1);
         }
         {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<int>();
+
+            int call_then_only_once = 0;
+            pr::make_all_promise(std::array<pr::promise<int>, 2>{p1, p2})
+            .then([&call_then_only_once](const std::vector<int>& c){
+                (void)c;
+                ++call_then_only_once;
+            });
+
+            p1.resolve(1);
+            p2.resolve(2);
+
+            REQUIRE(call_then_only_once == 1);
+        }
+        {
             class o_t {
             public:
                 o_t() = delete;
@@ -736,6 +753,26 @@ TEST_CASE("promise") {
             int check_42_int = 0;
             int call_then_only_once = 0;
             pr::make_race_promise(std::vector<pr::promise<int>>{p1, p2})
+            .then([&check_42_int, &call_then_only_once](const int& v){
+                check_42_int = v;
+                ++call_then_only_once;
+            });
+
+            p2.resolve(42);
+            REQUIRE(check_42_int == 42);
+            REQUIRE(call_then_only_once == 1);
+
+            p1.resolve(84);
+            REQUIRE(check_42_int == 42);
+            REQUIRE(call_then_only_once == 1);
+        }
+        {
+            auto p1 = pr::promise<int>();
+            auto p2 = pr::promise<int>();
+
+            int check_42_int = 0;
+            int call_then_only_once = 0;
+            pr::make_race_promise(std::array<pr::promise<int>,2>{p1, p2})
             .then([&check_42_int, &call_then_only_once](const int& v){
                 check_42_int = v;
                 ++call_then_only_once;

@@ -1111,7 +1111,7 @@ namespace promise_hpp
     }
 
     template < typename Iter
-             , typename SubPromise = typename Iter::value_type
+             , typename SubPromise = typename std::iterator_traits<Iter>::value_type
              , typename SubPromiseResult = typename SubPromise::value_type
              , typename ResultPromiseValueType = std::vector<SubPromiseResult> >
     promise<ResultPromiseValueType>
@@ -1149,9 +1149,10 @@ namespace promise_hpp
     //
 
     template < typename Iter
-             , typename SubPromise = typename Iter::value_type
+             , typename SubPromise = typename std::iterator_traits<Iter>::value_type
              , typename SubPromiseResult = typename SubPromise::value_type >
-    auto make_race_promise(Iter begin, Iter end) {
+    promise<SubPromiseResult>
+    make_race_promise(Iter begin, Iter end) {
         if ( begin == end ) {
             throw std::logic_error("at least one input promise must be provided for make_race_promise");
         }
