@@ -6,22 +6,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cassert>
-
-#include <tuple>
-#include <mutex>
-#include <atomic>
-#include <thread>
-#include <chrono>
-#include <memory>
-#include <vector>
-#include <utility>
-#include <exception>
-#include <stdexcept>
-#include <type_traits>
-#include <condition_variable>
-
 #include "promise.hpp"
 
 namespace jobber_hpp
@@ -58,7 +42,7 @@ namespace jobber_hpp
             std::size_t>;
 
         template < typename F, typename... Args >
-        using async_invoke_result_t = invoke_hpp::invoke_result_t<
+        using async_invoke_result_t = std::invoke_result_t<
             std::decay_t<F>,
             std::decay_t<Args>...>;
 
@@ -378,7 +362,7 @@ namespace jobber_hpp
     template < typename R, typename F, typename... Args >
     void jobber::concrete_task<R, F, Args...>::run() noexcept {
         try {
-            R value = invoke_hpp::apply(std::move(f_), std::move(args_));
+            R value = std::apply(std::move(f_), std::move(args_));
             promise_.resolve(std::move(value));
         } catch (...) {
             promise_.reject(std::current_exception());
@@ -408,7 +392,7 @@ namespace jobber_hpp
     template < typename F, typename... Args >
     void jobber::concrete_task<void, F, Args...>::run() noexcept {
         try {
-            invoke_hpp::apply(std::move(f_), std::move(args_));
+            std::apply(std::move(f_), std::move(args_));
             promise_.resolve();
         } catch (...) {
             promise_.reject(std::current_exception());

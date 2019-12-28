@@ -13,6 +13,7 @@
 #include <tuple>
 #include <mutex>
 #include <atomic>
+#include <thread>
 #include <chrono>
 #include <memory>
 #include <vector>
@@ -23,8 +24,6 @@
 #include <functional>
 #include <type_traits>
 #include <condition_variable>
-
-#include "invoke.hpp"
 
 namespace promise_hpp
 {
@@ -180,7 +179,7 @@ namespace promise_hpp
         }
 
         template < typename ResolveF
-                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF,T> >
+                 , typename ResolveFR = std::invoke_result_t<ResolveF,T> >
         std::enable_if_t<
             is_promise<ResolveFR>::value && std::is_void<typename ResolveFR::value_type>::value,
             promise<typename ResolveFR::value_type>>
@@ -191,7 +190,7 @@ namespace promise_hpp
                 n = next,
                 f = std::forward<ResolveF>(on_resolve)
             ](auto&& v) mutable {
-                auto np = invoke_hpp::invoke(
+                auto np = std::invoke(
                     std::forward<decltype(f)>(f),
                     std::forward<decltype(v)>(v));
                 std::move(np).then([n]() mutable {
@@ -207,7 +206,7 @@ namespace promise_hpp
         }
 
         template < typename ResolveF
-                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF,T> >
+                 , typename ResolveFR = std::invoke_result_t<ResolveF,T> >
         std::enable_if_t<
             is_promise<ResolveFR>::value && !std::is_void<typename ResolveFR::value_type>::value,
             promise<typename ResolveFR::value_type>>
@@ -218,7 +217,7 @@ namespace promise_hpp
                 n = next,
                 f = std::forward<ResolveF>(on_resolve)
             ](auto&& v) mutable {
-                auto np = invoke_hpp::invoke(
+                auto np = std::invoke(
                     std::forward<decltype(f)>(f),
                     std::forward<decltype(v)>(v));
                 std::move(np).then([n](auto&& nv) mutable {
@@ -238,7 +237,7 @@ namespace promise_hpp
             return then([
                 f = std::forward<ResolveF>(on_resolve)
             ](auto&& v) mutable {
-                auto r = invoke_hpp::invoke(
+                auto r = std::invoke(
                     std::forward<decltype(f)>(f),
                     std::forward<decltype(v)>(v));
                 return make_all_promise(std::move(r));
@@ -250,7 +249,7 @@ namespace promise_hpp
             return then([
                 f = std::forward<ResolveF>(on_resolve)
             ](auto&& v) mutable {
-                auto r = invoke_hpp::invoke(
+                auto r = std::invoke(
                     std::forward<decltype(f)>(f),
                     std::forward<decltype(v)>(v));
                 return make_race_promise(std::move(r));
@@ -262,7 +261,7 @@ namespace promise_hpp
             return then([
                 f = std::forward<ResolveF>(on_resolve)
             ](auto&& v) mutable {
-                auto r = invoke_hpp::invoke(
+                auto r = std::invoke(
                     std::forward<decltype(f)>(f),
                     std::forward<decltype(v)>(v));
                 return make_tuple_promise(std::move(r));
@@ -271,7 +270,7 @@ namespace promise_hpp
 
         template < typename ResolveF
                  , typename RejectF
-                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF,T> >
+                 , typename ResolveFR = std::invoke_result_t<ResolveF,T> >
         std::enable_if_t<
             !is_promise<ResolveFR>::value,
             promise<ResolveFR>>
@@ -286,7 +285,7 @@ namespace promise_hpp
         }
 
         template < typename ResolveF
-                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF,T> >
+                 , typename ResolveFR = std::invoke_result_t<ResolveF,T> >
         std::enable_if_t<
             !is_promise<ResolveFR>::value,
             promise<ResolveFR>>
@@ -443,7 +442,7 @@ namespace promise_hpp
                 ](std::exception_ptr e) mutable {
                     if ( has_reject ) {
                         try {
-                            invoke_hpp::invoke(
+                            std::invoke(
                                 std::forward<decltype(f)>(f),
                                 e);
                             n.resolve();
@@ -460,7 +459,7 @@ namespace promise_hpp
                     f = std::forward<ResolveF>(on_resolve)
                 ](auto&& v) mutable {
                     try {
-                        invoke_hpp::invoke(
+                        std::invoke(
                             std::forward<decltype(f)>(f),
                             std::forward<decltype(v)>(v));
                         n.resolve();
@@ -488,7 +487,7 @@ namespace promise_hpp
                 ](std::exception_ptr e) mutable {
                     if ( has_reject ) {
                         try {
-                            auto r = invoke_hpp::invoke(
+                            auto r = std::invoke(
                                 std::forward<decltype(f)>(f),
                                 e);
                             n.resolve(std::move(r));
@@ -505,7 +504,7 @@ namespace promise_hpp
                     f = std::forward<ResolveF>(on_resolve)
                 ](auto&& v) mutable {
                     try {
-                        auto r = invoke_hpp::invoke(
+                        auto r = std::invoke(
                             std::forward<decltype(f)>(f),
                             std::forward<decltype(v)>(v));
                         n.resolve(std::move(r));
@@ -521,11 +520,11 @@ namespace promise_hpp
             template < typename ResolveF, typename RejectF >
             void add_handlers_(ResolveF&& resolve, RejectF&& reject) {
                 if ( status_ == status::resolved ) {
-                    invoke_hpp::invoke(
+                    std::invoke(
                         std::forward<ResolveF>(resolve),
                         storage_.value());
                 } else if ( status_ == status::rejected ) {
-                    invoke_hpp::invoke(
+                    std::invoke(
                         std::forward<RejectF>(reject),
                         exception_);
                 } else {
@@ -616,7 +615,7 @@ namespace promise_hpp
         }
 
         template < typename ResolveF
-                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF> >
+                 , typename ResolveFR = std::invoke_result_t<ResolveF> >
         std::enable_if_t<
             is_promise<ResolveFR>::value && std::is_void<typename ResolveFR::value_type>::value,
             promise<typename ResolveFR::value_type>>
@@ -627,7 +626,7 @@ namespace promise_hpp
                 n = next,
                 f = std::forward<ResolveF>(on_resolve)
             ]() mutable {
-                auto np = invoke_hpp::invoke(
+                auto np = std::invoke(
                     std::forward<decltype(f)>(f));
                 std::move(np).then([n]() mutable {
                     n.resolve();
@@ -642,7 +641,7 @@ namespace promise_hpp
         }
 
         template < typename ResolveF
-                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF> >
+                 , typename ResolveFR = std::invoke_result_t<ResolveF> >
         std::enable_if_t<
             is_promise<ResolveFR>::value && !std::is_void<typename ResolveFR::value_type>::value,
             promise<typename ResolveFR::value_type>>
@@ -653,7 +652,7 @@ namespace promise_hpp
                 n = next,
                 f = std::forward<ResolveF>(on_resolve)
             ]() mutable {
-                auto np = invoke_hpp::invoke(
+                auto np = std::invoke(
                     std::forward<decltype(f)>(f));
                 std::move(np).then([n](auto&& nv) mutable {
                     n.resolve(std::forward<decltype(nv)>(nv));
@@ -672,7 +671,7 @@ namespace promise_hpp
             return then([
                 f = std::forward<ResolveF>(on_resolve)
             ]() mutable {
-                auto r = invoke_hpp::invoke(
+                auto r = std::invoke(
                     std::forward<decltype(f)>(f));
                 return make_all_promise(std::move(r));
             });
@@ -683,7 +682,7 @@ namespace promise_hpp
             return then([
                 f = std::forward<ResolveF>(on_resolve)
             ]() mutable {
-                auto r = invoke_hpp::invoke(
+                auto r = std::invoke(
                     std::forward<decltype(f)>(f));
                 return make_race_promise(std::move(r));
             });
@@ -694,7 +693,7 @@ namespace promise_hpp
             return then([
                 f = std::forward<ResolveF>(on_resolve)
             ]() mutable {
-                auto r = invoke_hpp::invoke(
+                auto r = std::invoke(
                     std::forward<decltype(f)>(f));
                 return make_tuple_promise(std::move(r));
             });
@@ -702,7 +701,7 @@ namespace promise_hpp
 
         template < typename ResolveF
                  , typename RejectF
-                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF> >
+                 , typename ResolveFR = std::invoke_result_t<ResolveF> >
         std::enable_if_t<
             !is_promise<ResolveFR>::value,
             promise<ResolveFR>>
@@ -717,7 +716,7 @@ namespace promise_hpp
         }
 
         template < typename ResolveF
-                 , typename ResolveFR = invoke_hpp::invoke_result_t<ResolveF> >
+                 , typename ResolveFR = std::invoke_result_t<ResolveF> >
         std::enable_if_t<
             !is_promise<ResolveFR>::value,
             promise<ResolveFR>>
@@ -869,7 +868,7 @@ namespace promise_hpp
                 ](std::exception_ptr e) mutable {
                     if ( has_reject ) {
                         try {
-                            invoke_hpp::invoke(
+                            std::invoke(
                                 std::forward<decltype(f)>(f),
                                 e);
                             n.resolve();
@@ -886,7 +885,7 @@ namespace promise_hpp
                     f = std::forward<ResolveF>(on_resolve)
                 ]() mutable {
                     try {
-                        invoke_hpp::invoke(
+                        std::invoke(
                             std::forward<decltype(f)>(f));
                         n.resolve();
                     } catch (...) {
@@ -913,7 +912,7 @@ namespace promise_hpp
                 ](std::exception_ptr e) mutable {
                     if ( has_reject ) {
                         try {
-                            auto r = invoke_hpp::invoke(
+                            auto r = std::invoke(
                                 std::forward<decltype(f)>(f),
                                 e);
                             n.resolve(std::move(r));
@@ -930,7 +929,7 @@ namespace promise_hpp
                     f = std::forward<ResolveF>(on_resolve)
                 ]() mutable {
                     try {
-                        auto r = invoke_hpp::invoke(
+                        auto r = std::invoke(
                             std::forward<decltype(f)>(f));
                         n.resolve(std::move(r));
                     } catch (...) {
@@ -945,10 +944,10 @@ namespace promise_hpp
             template < typename ResolveF, typename RejectF >
             void add_handlers_(ResolveF&& resolve, RejectF&& reject) {
                 if ( status_ == status::resolved ) {
-                    invoke_hpp::invoke(
+                    std::invoke(
                         std::forward<ResolveF>(resolve));
                 } else if ( status_ == status::rejected ) {
-                    invoke_hpp::invoke(
+                    std::invoke(
                         std::forward<RejectF>(reject),
                         exception_);
                 } else {
@@ -1032,7 +1031,7 @@ namespace promise_hpp
         };
 
         try {
-            invoke_hpp::invoke(
+            std::invoke(
                 std::forward<F>(f),
                 std::move(resolver),
                 std::move(rejector));
