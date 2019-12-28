@@ -6,21 +6,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cassert>
-
-#include <tuple>
-#include <mutex>
-#include <atomic>
-#include <chrono>
-#include <memory>
-#include <vector>
-#include <utility>
-#include <exception>
-#include <stdexcept>
-#include <type_traits>
-#include <condition_variable>
-
 #include "promise.hpp"
 
 namespace scheduler_hpp
@@ -57,7 +42,7 @@ namespace scheduler_hpp
             std::size_t>;
 
         template < typename F, typename... Args >
-        using schedule_invoke_result_t = invoke_hpp::invoke_result_t<
+        using schedule_invoke_result_t = std::invoke_result_t<
             std::decay_t<F>,
             std::decay_t<Args>...>;
 
@@ -286,7 +271,7 @@ namespace scheduler_hpp
     template < typename R, typename F, typename... Args >
     void scheduler::concrete_task<R, F, Args...>::run() noexcept {
         try {
-            R value = invoke_hpp::apply(std::move(f_), std::move(args_));
+            R value = std::apply(std::move(f_), std::move(args_));
             promise_.resolve(std::move(value));
         } catch (...) {
             promise_.reject(std::current_exception());
@@ -316,7 +301,7 @@ namespace scheduler_hpp
     template < typename F, typename... Args >
     void scheduler::concrete_task<void, F, Args...>::run() noexcept {
         try {
-            invoke_hpp::apply(std::move(f_), std::move(args_));
+            std::apply(std::move(f_), std::move(args_));
             promise_.resolve();
         } catch (...) {
             promise_.reject(std::current_exception());
