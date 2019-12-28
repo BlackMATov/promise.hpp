@@ -58,6 +58,10 @@ namespace jobber_hpp
         void resume() noexcept;
         bool is_paused() const noexcept;
 
+        std::size_t thread_count() const noexcept;
+        std::thread::id thread_id(std::size_t i) const;
+        std::vector<std::thread::id> thread_ids() const;
+
         jobber_wait_status wait_all() const noexcept;
         active_wait_result_t active_wait_all() noexcept;
         active_wait_result_t active_wait_one() noexcept;
@@ -187,6 +191,23 @@ namespace jobber_hpp
 
     inline bool jobber::is_paused() const noexcept {
         return paused_;
+    }
+
+    inline std::size_t jobber::thread_count() const noexcept {
+        return threads_.size();
+    }
+
+    inline std::thread::id jobber::thread_id(std::size_t i) const {
+        return threads_[i].get_id();
+    }
+
+    inline std::vector<std::thread::id> jobber::thread_ids() const {
+        std::vector<std::thread::id> ids;
+        ids.reserve(threads_.size());
+        for ( const std::thread& t : threads_ ) {
+            ids.push_back(t.get_id());
+        }
+        return ids;
     }
 
     inline jobber_wait_status jobber::wait_all() const noexcept {
