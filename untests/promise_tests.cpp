@@ -202,6 +202,30 @@ TEST_CASE("promise") {
             REQUIRE(check_100500_transform == 100500);
         }
     }
+    SECTION("resolved_ref") {
+        {
+            int* check_42_int = nullptr;
+            auto p = pr::promise<int&>();
+            int i = 42;
+            p.resolve(i);
+            p.then([&check_42_int](int& value) mutable {
+                check_42_int = &value;
+            });
+            REQUIRE(check_42_int);
+            REQUIRE(*check_42_int == 42);
+        }
+        {
+            const int* check_42_int = nullptr;
+            auto p = pr::promise<const int&>();
+            const int i = 42;
+            p.resolve(i);
+            p.then([&check_42_int](const int& value) mutable {
+                check_42_int = &value;
+            });
+            REQUIRE(check_42_int);
+            REQUIRE(*check_42_int == 42);
+        }
+    }
     SECTION("rejected") {
         {
             bool call_fail_with_logic_error = false;
@@ -865,6 +889,21 @@ TEST_CASE("promise") {
                 auto p1 = pr::promise<o_t>();
                 auto p2 = pr::promise<o_t>();
                 return std::make_tuple(std::move(p1), std::move(p2));
+            });
+        }
+        {
+            auto p1 = pr::promise<int&>();
+            auto p2 = pr::promise<float&>();
+            auto p3 = pr::make_tuple_promise(std::make_tuple(p1, p2));
+
+            int i = 10;
+            float f = 0.f;
+            p1.resolve(i);
+            p2.resolve(f);
+
+            p3.then([&i,&f](const std::tuple<int&, float&>& t){
+                REQUIRE(&std::get<0>(t) == &i);
+                REQUIRE(&std::get<1>(t) == &f);
             });
         }
     }
