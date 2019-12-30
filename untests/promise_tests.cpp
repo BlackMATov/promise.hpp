@@ -205,7 +205,7 @@ TEST_CASE("promise") {
     SECTION("resolved_ref") {
         {
             int* check_42_int = nullptr;
-            auto p = pr::promise<int&>();
+            auto p = pr::promise<std::reference_wrapper<int>>();
             int i = 42;
             p.resolve(i);
             p.then([&check_42_int](int& value) mutable {
@@ -216,7 +216,7 @@ TEST_CASE("promise") {
         }
         {
             const int* check_42_int = nullptr;
-            auto p = pr::promise<const int&>();
+            auto p = pr::promise<std::reference_wrapper<const int>>();
             const int i = 42;
             p.resolve(i);
             p.then([&check_42_int](const int& value) mutable {
@@ -692,9 +692,23 @@ TEST_CASE("promise") {
         }
         {
             bool all_is_ok = false;
-            auto p = pr::make_all_promise(std::vector<pr::promise<int>>{
-                pr::make_resolved_promise(32),
-                pr::make_resolved_promise(10)
+            auto p = pr::make_resolved_promise().then_all([](){
+                return std::vector<pr::promise<int>>{
+                    pr::make_resolved_promise(32),
+                    pr::make_resolved_promise(10)};
+            }).then([&all_is_ok](const std::vector<int>& c){
+                all_is_ok = (2 == c.size())
+                    && c[0] == 32
+                    && c[1] == 10;
+            });
+            REQUIRE(all_is_ok);
+        }
+        {
+            bool all_is_ok = false;
+            auto p = pr::make_resolved_promise(1).then_all([](int){
+                return std::vector<pr::promise<int>>{
+                    pr::make_resolved_promise(32),
+                    pr::make_resolved_promise(10)};
             }).then([&all_is_ok](const std::vector<int>& c){
                 all_is_ok = (2 == c.size())
                     && c[0] == 32
@@ -747,6 +761,60 @@ TEST_CASE("promise") {
                     pr::make_resolved_promise<o_t>(40),
                     pr::make_resolved_promise<o_t>(2)};
             });
+        }
+    }
+    SECTION("make_any_promise") {
+        REQUIRE_THROWS_AS(
+            pr::make_any_promise(std::vector<pr::promise<int>>{}),
+            std::logic_error);
+        {
+            auto p = pr::make_resolved_promise().then_any([](){
+               return std::vector<pr::promise<int>>{
+                    pr::make_resolved_promise(32),
+                    pr::make_resolved_promise(10)};
+            }).then([](int i){
+                return i;
+            });
+            REQUIRE(p.get() == 32);
+        }
+        {
+            auto p = pr::make_resolved_promise(1).then_any([](int){
+               return std::vector<pr::promise<int>>{
+                    pr::make_resolved_promise(32),
+                    pr::make_resolved_promise(10)};
+            }).then([](int i){
+                return i;
+            });
+            REQUIRE(p.get() == 32);
+        }
+        {
+            auto p = pr::make_any_promise(std::vector<pr::promise<int>>{
+                pr::make_resolved_promise(32),
+                pr::make_rejected_promise<int>(std::logic_error("hello fail"))
+            }).then([](int i){
+                return i;
+            });
+            REQUIRE(p.get() == 32);
+        }
+        {
+            auto p = pr::make_any_promise(std::vector<pr::promise<int>>{
+                pr::make_rejected_promise<int>(std::logic_error("hello fail")),
+                pr::make_resolved_promise(32)
+            }).then([](int i){
+                return i;
+            });
+            REQUIRE(p.get() == 32);
+        }
+        {
+            bool all_is_ok = false;
+            auto p = pr::make_any_promise(std::vector<pr::promise<int>>{
+                pr::make_rejected_promise<int>(std::logic_error("hello fail")),
+                pr::make_rejected_promise<int>(std::logic_error("hello fail"))
+            }).except([&all_is_ok](std::exception_ptr e){
+                all_is_ok = true;
+                return 0;
+            });
+            REQUIRE(all_is_ok);
         }
     }
     SECTION("make_race_promise") {
@@ -892,8 +960,8 @@ TEST_CASE("promise") {
             });
         }
         {
-            auto p1 = pr::promise<int&>();
-            auto p2 = pr::promise<float&>();
+            auto p1 = pr::promise<std::reference_wrapper<int>>();
+            auto p2 = pr::promise<std::reference_wrapper<float>>();
             auto p3 = pr::make_tuple_promise(std::make_tuple(p1, p2));
 
             int i = 10;
