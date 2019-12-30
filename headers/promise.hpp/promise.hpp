@@ -79,113 +79,117 @@ namespace promise_hpp
     inline constexpr bool is_promise_r_v = is_promise_r<R, T>::value;
 
     //
-    // detail
-    //
-
-    namespace detail
-    {
-        class noncopyable {
-        public:
-            noncopyable(const noncopyable&) = delete;
-            noncopyable& operator=(const noncopyable&) = delete;
-        protected:
-            noncopyable() = default;
-            ~noncopyable() = default;
-        };
-
-        template < typename T >
-        class storage final : private noncopyable {
-        public:
-            storage() = default;
-
-            ~storage()
-            noexcept(std::is_nothrow_destructible_v<T>) {
-                if ( initialized_ ) {
-                    ptr_()->~T();
-                }
-            }
-
-            void set(T&& value)
-            noexcept(std::is_nothrow_move_constructible_v<T>) {
-                assert(!initialized_);
-                ::new(ptr_()) T(std::move(value));
-                initialized_ = true;
-            }
-
-            void set(const T& value)
-            noexcept(std::is_nothrow_copy_constructible_v<T>) {
-                assert(!initialized_);
-                ::new(ptr_()) T(value);
-                initialized_ = true;
-            }
-
-            T get()
-            noexcept(std::is_nothrow_move_constructible_v<T>) {
-                assert(initialized_);
-                return std::move(*ptr_());
-            }
-
-            T& value() noexcept {
-                assert(initialized_);
-                return *ptr_();
-            }
-
-            const T& value() const noexcept {
-                assert(initialized_);
-                return *ptr_();
-            }
-        private:
-            T* ptr_() noexcept {
-                return reinterpret_cast<T*>(&data_);
-            }
-
-            const T* ptr_() const noexcept {
-                return reinterpret_cast<const T*>(&data_);
-            }
-        private:
-            std::aligned_storage_t<sizeof(T), alignof(T)> data_;
-            bool initialized_ = false;
-        };
-
-        template < typename T >
-        class storage<T&> final : private noncopyable {
-        public:
-            storage() = default;
-            ~storage() = default;
-
-            void set(T& value) noexcept {
-                assert(!initialized_);
-                value_ = &value;
-                initialized_ = true;
-            }
-
-            T& get() noexcept {
-                assert(initialized_);
-                return *value_;
-            }
-
-            T& value() noexcept {
-                assert(initialized_);
-                return *value_;
-            }
-
-            const T& value() const noexcept {
-                assert(initialized_);
-                return *value_;
-            }
-        private:
-            T* value_{nullptr};
-            bool initialized_ = false;
-        };
-    }
-
-    //
     // promise_wait_status
     //
 
     enum class promise_wait_status {
         no_timeout,
         timeout
+    };
+}
+
+// -----------------------------------------------------------------------------
+//
+// detail
+//
+// -----------------------------------------------------------------------------
+
+namespace promise_hpp::detail
+{
+    template < typename T >
+    void destroy_in_place(T& ref) noexcept {
+        ref.~T();
+    }
+
+    template < typename T, typename... Args >
+    void construct_in_place(T& ref, Args&&... args)
+    noexcept(std::is_nothrow_constructible_v<T, Args...>) {
+        ::new (std::addressof(ref)) T(std::forward<Args>(args)...);
+    }
+
+    class noncopyable {
+    public:
+        noncopyable(const noncopyable&) = delete;
+        noncopyable& operator=(const noncopyable&) = delete;
+    protected:
+        noncopyable() = default;
+        ~noncopyable() = default;
+    };
+
+    template < typename T >
+    class storage final : private noncopyable {
+    public:
+        storage() = default;
+
+        ~storage() noexcept {
+            if ( initialized_ ) {
+                destroy_in_place(*ptr_());
+            }
+        }
+
+        storage& operator=(T&& value)
+        noexcept(std::is_nothrow_move_constructible_v<T>) {
+            assert(!initialized_);
+            construct_in_place(*ptr_(), std::move(value));
+            initialized_ = true;
+            return *this;
+        }
+
+        storage& operator=(const T& value)
+        noexcept(std::is_nothrow_copy_constructible_v<T>) {
+            assert(!initialized_);
+            construct_in_place(*ptr_(), value);
+            initialized_ = true;
+            return *this;
+        }
+
+        T& operator*() noexcept {
+            assert(initialized_);
+            return *ptr_();
+        }
+
+        const T& operator*() const noexcept {
+            assert(initialized_);
+            return *ptr_();
+        }
+    private:
+        T* ptr_() noexcept {
+            return reinterpret_cast<T*>(&data_);
+        }
+
+        const T* ptr_() const noexcept {
+            return reinterpret_cast<const T*>(&data_);
+        }
+    private:
+        std::aligned_storage_t<sizeof(T), alignof(T)> data_;
+        bool initialized_ = false;
+    };
+
+    template < typename T >
+    class storage<T&> final : private noncopyable {
+    public:
+        storage() = default;
+        ~storage() = default;
+
+        storage& operator=(T& value) noexcept {
+            assert(!initialized_);
+            value_ = &value;
+            initialized_ = true;
+            return *this;
+        }
+
+        T& operator*() noexcept {
+            assert(initialized_);
+            return *value_;
+        }
+
+        const T& operator*() const noexcept {
+            assert(initialized_);
+            return *value_;
+        }
+    private:
+        T* value_{nullptr};
+        bool initialized_ = false;
     };
 }
 
@@ -299,10 +303,10 @@ namespace promise_hpp
             then([
                 n = next,
                 f = std::forward<ResolveF>(on_resolve)
-            ](auto&&... vs) mutable {
+            ](auto&& v) mutable {
                 auto np = std::invoke(
                     std::forward<decltype(f)>(f),
-                    std::forward<decltype(vs)>(vs)...);
+                    std::forward<decltype(v)>(v));
                 std::move(np).then([n](auto&&... nvs) mutable {
                     n.resolve(std::forward<decltype(nvs)>(nvs)...);
                 }).except([n](std::exception_ptr e) mutable {
@@ -417,7 +421,7 @@ namespace promise_hpp
                     std::rethrow_exception(exception_);
                 }
                 assert(status_ == status::resolved);
-                return storage_.value();
+                return *storage_;
             }
 
             void wait() const noexcept {
@@ -449,7 +453,7 @@ namespace promise_hpp
                 if ( status_ != status::pending ) {
                     return false;
                 }
-                storage_.set(std::forward<U>(value));
+                storage_ = std::forward<U>(value);
                 status_ = status::resolved;
                 invoke_resolve_handlers_();
                 cond_var_.notify_all();
@@ -553,7 +557,7 @@ namespace promise_hpp
                 if ( status_ == status::resolved ) {
                     std::invoke(
                         std::forward<ResolveF>(resolve),
-                        storage_.value());
+                        *storage_);
                 } else if ( status_ == status::rejected ) {
                     std::invoke(
                         std::forward<RejectF>(reject),
@@ -567,7 +571,7 @@ namespace promise_hpp
 
             void invoke_resolve_handlers_() noexcept {
                 for ( const auto& h : handlers_ ) {
-                    h.resolve_(storage_.value());
+                    h.resolve_(*storage_);
                 }
                 handlers_.clear();
             }
@@ -599,8 +603,8 @@ namespace promise_hpp
                 reject_t reject_;
             };
 
-            std::vector<handler> handlers_;
             detail::storage<T> storage_;
+            std::vector<handler> handlers_;
         };
     };
 }
@@ -713,10 +717,9 @@ namespace promise_hpp
             then([
                 n = next,
                 f = std::forward<ResolveF>(on_resolve)
-            ](auto&&... vs) mutable {
+            ]() mutable {
                 auto np = std::invoke(
-                    std::forward<decltype(f)>(f),
-                    std::forward<decltype(vs)>(vs)...);
+                    std::forward<decltype(f)>(f));
                 std::move(np).then([n](auto&&... nvs) mutable {
                     n.resolve(std::forward<decltype(nvs)>(nvs)...);
                 }).except([n](std::exception_ptr e) mutable {
@@ -1102,7 +1105,7 @@ namespace promise_hpp
 
             template < typename T >
             bool apply_result(std::size_t index, T&& value) {
-                results_[index].set(std::forward<T>(value));
+                results_[index] = std::forward<T>(value);
                 return ++counter_ == results_.size();
             }
 
@@ -1110,7 +1113,7 @@ namespace promise_hpp
                 std::vector<ResultType> ret;
                 ret.reserve(results_.size());
                 for ( auto&& v : results_ ) {
-                    ret.push_back(v.get());
+                    ret.push_back(std::move(*v));
                 }
                 return ret;
             }
@@ -1205,11 +1208,11 @@ namespace promise_hpp
         using tuple_promise_result_t = typename tuple_promise_result<Tuple>::type;
 
         template < typename... ResultTypes >
-        class tuple_promise_context_t {
+        class tuple_promise_context_t final : private detail::noncopyable {
         public:
             template < std::size_t N, typename T >
             bool apply_result(T&& value) {
-                std::get<N>(results_).set(std::forward<T>(value));
+                std::get<N>(results_) = std::forward<T>(value);
                 return ++counter_ == sizeof...(ResultTypes);
             }
 
@@ -1220,7 +1223,7 @@ namespace promise_hpp
         private:
             template < std::size_t... Is >
             std::tuple<ResultTypes...> get_results_impl(std::index_sequence<Is...>) {
-                return {std::get<Is>(results_).get()...};
+                return {std::move(*std::get<Is>(results_))...};
             }
         private:
             std::atomic_size_t counter_{0};

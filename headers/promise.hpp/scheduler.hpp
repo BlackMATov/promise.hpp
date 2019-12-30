@@ -26,7 +26,7 @@ namespace scheduler_hpp
         cancelled
     };
 
-    class scheduler_cancelled_exception : public std::runtime_error {
+    class scheduler_cancelled_exception final : public std::runtime_error {
     public:
         scheduler_cancelled_exception()
         : std::runtime_error("scheduler has stopped working") {}
@@ -82,7 +82,7 @@ namespace scheduler_hpp
         mutable std::condition_variable cond_var_;
     };
 
-    class scheduler::task : private noncopyable {
+    class scheduler::task : private detail::noncopyable {
     public:
         virtual ~task() noexcept = default;
         virtual void run() noexcept = 0;
@@ -90,7 +90,7 @@ namespace scheduler_hpp
     };
 
     template < typename R, typename F, typename... Args >
-    class scheduler::concrete_task : public task {
+    class scheduler::concrete_task final : public task {
         F f_;
         std::tuple<Args...> args_;
         promise<R> promise_;
@@ -103,7 +103,7 @@ namespace scheduler_hpp
     };
 
     template < typename F, typename... Args >
-    class scheduler::concrete_task<void, F, Args...> : public task {
+    class scheduler::concrete_task<void, F, Args...> final : public task {
         F f_;
         std::tuple<Args...> args_;
         promise<void> promise_;

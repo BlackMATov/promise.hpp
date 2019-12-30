@@ -205,7 +205,7 @@ TEST_CASE("promise") {
     SECTION("resolved_ref") {
         {
             int* check_42_int = nullptr;
-            auto p = pr::promise<int&>();
+            auto p = pr::promise<std::reference_wrapper<int>>();
             int i = 42;
             p.resolve(i);
             p.then([&check_42_int](int& value) mutable {
@@ -216,7 +216,7 @@ TEST_CASE("promise") {
         }
         {
             const int* check_42_int = nullptr;
-            auto p = pr::promise<const int&>();
+            auto p = pr::promise<std::reference_wrapper<const int>>();
             const int i = 42;
             p.resolve(i);
             p.then([&check_42_int](const int& value) mutable {
@@ -892,8 +892,8 @@ TEST_CASE("promise") {
             });
         }
         {
-            auto p1 = pr::promise<int&>();
-            auto p2 = pr::promise<float&>();
+            auto p1 = pr::promise<std::reference_wrapper<int>>();
+            auto p2 = pr::promise<std::reference_wrapper<float>>();
             auto p3 = pr::make_tuple_promise(std::make_tuple(p1, p2));
 
             int i = 10;

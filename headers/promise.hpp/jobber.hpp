@@ -26,7 +26,7 @@ namespace jobber_hpp
         timeout
     };
 
-    class jobber_cancelled_exception : public std::runtime_error {
+    class jobber_cancelled_exception final : public std::runtime_error {
     public:
         jobber_cancelled_exception()
         : std::runtime_error("jobber has stopped working") {}
@@ -102,7 +102,7 @@ namespace jobber_hpp
         mutable std::condition_variable cond_var_;
     };
 
-    class jobber::task : private noncopyable {
+    class jobber::task : private detail::noncopyable {
     public:
         virtual ~task() noexcept = default;
         virtual void run() noexcept = 0;
@@ -110,7 +110,7 @@ namespace jobber_hpp
     };
 
     template < typename R, typename F, typename... Args >
-    class jobber::concrete_task : public task {
+    class jobber::concrete_task final : public task {
         F f_;
         std::tuple<Args...> args_;
         promise<R> promise_;
@@ -123,7 +123,7 @@ namespace jobber_hpp
     };
 
     template < typename F, typename... Args >
-    class jobber::concrete_task<void, F, Args...> : public task {
+    class jobber::concrete_task<void, F, Args...> final : public task {
         F f_;
         std::tuple<Args...> args_;
         promise<void> promise_;
