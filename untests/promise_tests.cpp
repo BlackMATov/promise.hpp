@@ -30,6 +30,30 @@ namespace
         }
     }
 
+    bool check_empty_aggregate_exception(std::exception_ptr e) {
+        try {
+            std::rethrow_exception(e);
+        } catch (pr::aggregate_exception& ee) {
+            return ee.empty();
+        } catch (...) {
+            return false;
+        }
+    }
+
+    bool check_two_aggregate_exception(std::exception_ptr e) {
+        try {
+            std::rethrow_exception(e);
+        } catch (pr::aggregate_exception& ee) {
+            if ( ee.size() != 2 ) {
+                return false;
+            }
+            return check_hello_fail_exception(ee[0])
+                && check_hello_fail_exception(ee[1]);
+        } catch (...) {
+            return false;
+        }
+    }
+
     class auto_thread final {
     public:
         template < typename F, typename... Args >
@@ -308,6 +332,132 @@ TEST_CASE("promise") {
             p.reject(std::make_exception_ptr(std::logic_error("hello fail")));
             REQUIRE(not_call_then_on_reject);
             REQUIRE(call_fail_with_logic_error);
+        }
+    }
+    SECTION("finally") {
+        {
+            bool all_is_ok = false;
+            auto p = pr::promise<int>();
+            p.finally([&all_is_ok](){
+                all_is_ok = true;
+            });
+            REQUIRE_FALSE(all_is_ok);
+            p.resolve(1);
+            REQUIRE(all_is_ok);
+        }
+        {
+            bool all_is_ok = false;
+            auto p = pr::promise<int>();
+            p.finally([&all_is_ok](){
+                all_is_ok = true;
+            });
+            REQUIRE_FALSE(all_is_ok);
+            p.reject(std::make_exception_ptr(std::logic_error("hello fail")));
+            REQUIRE(all_is_ok);
+        }
+        {
+            bool all_is_ok = false;
+            pr::make_resolved_promise(1)
+            .finally([&all_is_ok](){
+                all_is_ok = true;
+            });
+            REQUIRE(all_is_ok);
+        }
+        {
+            bool all_is_ok = false;
+            pr::make_rejected_promise<int>(std::logic_error("hello fail"))
+            .finally([&all_is_ok](){
+                all_is_ok = true;
+            });
+            REQUIRE(all_is_ok);
+        }
+    }
+    SECTION("after_finally") {
+        {
+            int check_84_int = 0;
+            auto p = pr::promise<>();
+            p.finally([&check_84_int](){
+                check_84_int = 42;
+                return 100500;
+            }).then([&check_84_int](){
+                check_84_int *= 2;
+            });
+            REQUIRE(check_84_int == 0);
+            p.resolve();
+            REQUIRE(check_84_int == 84);
+        }
+        {
+            int check_84_int = 0;
+            auto p = pr::promise<>();
+            p.finally([&check_84_int](){
+                check_84_int = 42;
+                return 100500;
+            }).except([&check_84_int](std::exception_ptr){
+                check_84_int *= 2;
+            });
+            REQUIRE(check_84_int == 0);
+            p.reject(std::make_exception_ptr(std::logic_error("hello fail")));
+            REQUIRE(check_84_int == 84);
+        }
+    }
+    SECTION("failed_finally") {
+        {
+            int check_84_int = 0;
+            auto p = pr::promise<>();
+            p.finally([&check_84_int](){
+                check_84_int += 42;
+                throw std::logic_error("hello fail");
+            }).except([&check_84_int](std::exception_ptr e){
+                if ( check_hello_fail_exception(e) ) {
+                    check_84_int += 42;
+                }
+            });
+            p.resolve();
+            REQUIRE(check_84_int == 84);
+        }
+        {
+            int check_84_int = 0;
+            auto p = pr::promise<>();
+            p.finally([&check_84_int](){
+                check_84_int += 42;
+                throw std::logic_error("hello fail");
+            }).except([&check_84_int](std::exception_ptr e){
+                if ( check_hello_fail_exception(e) ) {
+                    check_84_int += 42;
+                }
+            });
+            p.reject(std::make_exception_ptr(std::logic_error("hello")));
+            REQUIRE(check_84_int == 84);
+        }
+        {
+            int check_84_int = 0;
+            auto p = pr::promise<int>();
+            p.finally([&check_84_int](){
+                check_84_int += 42;
+                throw std::logic_error("hello fail");
+            }).except([&check_84_int](std::exception_ptr e) -> int {
+                if ( check_hello_fail_exception(e) ) {
+                    check_84_int += 42;
+                }
+                return 0;
+            });
+            p.resolve(1);
+            REQUIRE(check_84_int == 84);
+        }
+        {
+            int check_84_int = 0;
+            auto p = pr::promise<int>();
+            p.finally([&check_84_int](){
+                check_84_int += 42;
+                throw std::logic_error("hello fail");
+            }).except([&check_84_int](std::exception_ptr e) -> int {
+                if ( check_hello_fail_exception(e) ) {
+                    check_84_int += 42;
+                }
+                return 0;
+            });
+            p.reject(std::make_exception_ptr(std::logic_error("hello")));
+            REQUIRE(check_84_int == 84);
         }
     }
     SECTION("make_promise") {
@@ -764,9 +914,15 @@ TEST_CASE("promise") {
         }
     }
     SECTION("make_any_promise") {
-        REQUIRE_THROWS_AS(
-            pr::make_any_promise(std::vector<pr::promise<int>>{}),
-            std::logic_error);
+        {
+            bool all_is_ok = false;
+            auto p = pr::make_any_promise(std::vector<pr::promise<int>>{});
+            p.except([&all_is_ok](std::exception_ptr e){
+                all_is_ok = check_empty_aggregate_exception(e);
+                return 0;
+            });
+            REQUIRE(all_is_ok);
+        }
         {
             auto p = pr::make_resolved_promise().then_any([](){
                return std::vector<pr::promise<int>>{
@@ -811,7 +967,7 @@ TEST_CASE("promise") {
                 pr::make_rejected_promise<int>(std::logic_error("hello fail")),
                 pr::make_rejected_promise<int>(std::logic_error("hello fail"))
             }).except([&all_is_ok](std::exception_ptr e){
-                all_is_ok = true;
+                all_is_ok = check_two_aggregate_exception(e);
                 return 0;
             });
             REQUIRE(all_is_ok);
@@ -1014,9 +1170,6 @@ TEST_CASE("promise") {
         }
     }
     SECTION("make_race_promise_fail") {
-        REQUIRE_THROWS_AS(
-            pr::make_race_promise(std::vector<pr::promise<int>>{}),
-            std::logic_error);
         {
             bool call_fail_with_logic_error = false;
             bool not_call_then_on_reject = true;
