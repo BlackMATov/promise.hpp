@@ -86,6 +86,54 @@ namespace promise_hpp
         no_timeout,
         timeout
     };
+
+    //
+    // aggregate_exception
+    //
+
+    class aggregate_exception final : public std::exception {
+    private:
+        using exceptions_t = std::vector<std::exception_ptr>;
+        using internal_state_t = std::shared_ptr<exceptions_t>;
+    public:
+        aggregate_exception()
+        : state_(std::make_shared<exceptions_t>()) {}
+
+        explicit aggregate_exception(exceptions_t exceptions)
+        : state_(std::make_shared<exceptions_t>(std::move(exceptions))) {}
+
+        aggregate_exception(const aggregate_exception& other) noexcept
+        : state_(other.state_) {}
+
+        aggregate_exception& operator=(const aggregate_exception& other) noexcept {
+            if ( this != &other ) {
+                state_ = other.state_;
+            }
+            return *this;
+        }
+
+        const char* what() const noexcept override {
+            return "Aggregate exception";
+        }
+
+        bool empty() const noexcept {
+            return (*state_).empty();
+        }
+
+        std::size_t size() const noexcept {
+            return (*state_).size();
+        }
+        
+        std::exception_ptr at(std::size_t index) const {
+            return (*state_).at(index);
+        }
+
+        std::exception_ptr operator[](std::size_t index) const noexcept {
+            return (*state_)[index];
+        }
+    private:
+        internal_state_t state_;
+    };
 }
 
 // -----------------------------------------------------------------------------
@@ -1165,15 +1213,12 @@ namespace promise_hpp
             , results(count) {}
         };
 
-        return make_promise<ResultPromiseValueType>([begin, end](auto&& resolver, auto&& rejector){
+        return make_promise<ResultPromiseValueType>(
+        [begin, end](auto&& resolver, auto&& rejector){
             std::size_t result_index = 0;
             auto context = std::make_shared<context_t>(std::distance(begin, end));
             for ( Iter iter = begin; iter != end; ++iter, ++result_index ) {
-                (*iter).then([
-                    context,
-                    resolver,
-                    result_index
-                ](auto&& v) mutable {
+                (*iter).then([context, resolver, result_index](auto&& v) mutable {
                     context->results[result_index] = std::forward<decltype(v)>(v);
                     if ( !--context->success_counter ) {
                         std::vector<SubPromiseResult> results;
@@ -1183,7 +1228,9 @@ namespace promise_hpp
                         }
                         resolver(std::move(results));
                     }
-                }).except(rejector);
+                }).except([rejector](std::exception_ptr e) mutable {
+                    rejector(e);
+                });
             }
         });
     }
@@ -1201,27 +1248,33 @@ namespace promise_hpp
 
     template < typename Iter
              , typename SubPromise = typename std::iterator_traits<Iter>::value_type
-             , typename SubPromiseResult = typename SubPromise::value_type >
-    promise<SubPromiseResult>
+             , typename SubPromiseResult = typename SubPromise::value_type
+             , typename ResultPromiseValueType = SubPromiseResult >
+    promise<ResultPromiseValueType>
     make_any_promise(Iter begin, Iter end) {
         if ( begin == end ) {
-            throw std::logic_error("at least one input promise must be provided for make_any_promise");
+            return make_rejected_promise<ResultPromiseValueType>(aggregate_exception());
         }
 
         struct context_t {
             std::atomic_size_t failure_counter{0u};
+            std::vector<std::exception_ptr> exceptions;
             context_t(std::size_t count)
-            : failure_counter(count) {}
+            : failure_counter(count)
+            , exceptions(count) {}
         };
 
-        return make_promise<SubPromiseResult>([begin, end](auto&& resolver, auto&& rejector){
+        return make_promise<ResultPromiseValueType>(
+        [begin, end](auto&& resolver, auto&& rejector){
+            std::size_t exception_index = 0;
             auto context = std::make_shared<context_t>(std::distance(begin, end));
-            for ( Iter iter = begin; iter != end; ++iter ) {
+            for ( Iter iter = begin; iter != end; ++iter, ++exception_index ) {
                 (*iter).then([resolver](auto&& v) mutable {
                     resolver(std::forward<decltype(v)>(v));
-                }).except([context, rejector](std::exception_ptr e) mutable {
+                }).except([context, rejector, exception_index](std::exception_ptr e) mutable {
+                    context->exceptions[exception_index] = e;
                     if ( !--context->failure_counter ) {
-                        rejector(e);
+                        rejector(aggregate_exception(std::move(context->exceptions)));
                     }
                 });
             }
@@ -1241,14 +1294,12 @@ namespace promise_hpp
 
     template < typename Iter
              , typename SubPromise = typename std::iterator_traits<Iter>::value_type
-             , typename SubPromiseResult = typename SubPromise::value_type >
-    promise<SubPromiseResult>
+             , typename SubPromiseResult = typename SubPromise::value_type
+             , typename ResultPromiseValueType = SubPromiseResult >
+    promise<ResultPromiseValueType>
     make_race_promise(Iter begin, Iter end) {
-        if ( begin == end ) {
-            throw std::logic_error("at least one input promise must be provided for make_race_promise");
-        }
-        
-        return make_promise<SubPromiseResult>([begin, end](auto&& resolver, auto&& rejector){
+        return make_promise<ResultPromiseValueType>(
+        [begin, end](auto&& resolver, auto&& rejector){
             for ( Iter iter = begin; iter != end; ++iter ) {
                 (*iter)
                 .then(resolver)

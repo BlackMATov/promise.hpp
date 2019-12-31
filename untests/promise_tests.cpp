@@ -30,6 +30,30 @@ namespace
         }
     }
 
+    bool check_empty_aggregate_exception(std::exception_ptr e) {
+        try {
+            std::rethrow_exception(e);
+        } catch (pr::aggregate_exception& ee) {
+            return ee.empty();
+        } catch (...) {
+            return false;
+        }
+    }
+
+    bool check_two_aggregate_exception(std::exception_ptr e) {
+        try {
+            std::rethrow_exception(e);
+        } catch (pr::aggregate_exception& ee) {
+            if ( ee.size() != 2 ) {
+                return false;
+            }
+            return check_hello_fail_exception(ee[0])
+                && check_hello_fail_exception(ee[1]);
+        } catch (...) {
+            return false;
+        }
+    }
+
     class auto_thread final {
     public:
         template < typename F, typename... Args >
@@ -890,9 +914,15 @@ TEST_CASE("promise") {
         }
     }
     SECTION("make_any_promise") {
-        REQUIRE_THROWS_AS(
-            pr::make_any_promise(std::vector<pr::promise<int>>{}),
-            std::logic_error);
+        {
+            bool all_is_ok = false;
+            auto p = pr::make_any_promise(std::vector<pr::promise<int>>{});
+            p.except([&all_is_ok](std::exception_ptr e){
+                all_is_ok = check_empty_aggregate_exception(e);
+                return 0;
+            });
+            REQUIRE(all_is_ok);
+        }
         {
             auto p = pr::make_resolved_promise().then_any([](){
                return std::vector<pr::promise<int>>{
@@ -937,7 +967,7 @@ TEST_CASE("promise") {
                 pr::make_rejected_promise<int>(std::logic_error("hello fail")),
                 pr::make_rejected_promise<int>(std::logic_error("hello fail"))
             }).except([&all_is_ok](std::exception_ptr e){
-                all_is_ok = true;
+                all_is_ok = check_two_aggregate_exception(e);
                 return 0;
             });
             REQUIRE(all_is_ok);
@@ -1140,9 +1170,6 @@ TEST_CASE("promise") {
         }
     }
     SECTION("make_race_promise_fail") {
-        REQUIRE_THROWS_AS(
-            pr::make_race_promise(std::vector<pr::promise<int>>{}),
-            std::logic_error);
         {
             bool call_fail_with_logic_error = false;
             bool not_call_then_on_reject = true;
