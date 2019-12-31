@@ -310,6 +310,132 @@ TEST_CASE("promise") {
             REQUIRE(call_fail_with_logic_error);
         }
     }
+    SECTION("finally") {
+        {
+            bool all_is_ok = false;
+            auto p = pr::promise<int>();
+            p.finally([&all_is_ok](){
+                all_is_ok = true;
+            });
+            REQUIRE_FALSE(all_is_ok);
+            p.resolve(1);
+            REQUIRE(all_is_ok);
+        }
+        {
+            bool all_is_ok = false;
+            auto p = pr::promise<int>();
+            p.finally([&all_is_ok](){
+                all_is_ok = true;
+            });
+            REQUIRE_FALSE(all_is_ok);
+            p.reject(std::make_exception_ptr(std::logic_error("hello fail")));
+            REQUIRE(all_is_ok);
+        }
+        {
+            bool all_is_ok = false;
+            pr::make_resolved_promise(1)
+            .finally([&all_is_ok](){
+                all_is_ok = true;
+            });
+            REQUIRE(all_is_ok);
+        }
+        {
+            bool all_is_ok = false;
+            pr::make_rejected_promise<int>(std::logic_error("hello fail"))
+            .finally([&all_is_ok](){
+                all_is_ok = true;
+            });
+            REQUIRE(all_is_ok);
+        }
+    }
+    SECTION("after_finally") {
+        {
+            int check_84_int = 0;
+            auto p = pr::promise<>();
+            p.finally([&check_84_int](){
+                check_84_int = 42;
+                return 100500;
+            }).then([&check_84_int](){
+                check_84_int *= 2;
+            });
+            REQUIRE(check_84_int == 0);
+            p.resolve();
+            REQUIRE(check_84_int == 84);
+        }
+        {
+            int check_84_int = 0;
+            auto p = pr::promise<>();
+            p.finally([&check_84_int](){
+                check_84_int = 42;
+                return 100500;
+            }).except([&check_84_int](std::exception_ptr){
+                check_84_int *= 2;
+            });
+            REQUIRE(check_84_int == 0);
+            p.reject(std::make_exception_ptr(std::logic_error("hello fail")));
+            REQUIRE(check_84_int == 84);
+        }
+    }
+    SECTION("failed_finally") {
+        {
+            int check_84_int = 0;
+            auto p = pr::promise<>();
+            p.finally([&check_84_int](){
+                check_84_int += 42;
+                throw std::logic_error("hello fail");
+            }).except([&check_84_int](std::exception_ptr e){
+                if ( check_hello_fail_exception(e) ) {
+                    check_84_int += 42;
+                }
+            });
+            p.resolve();
+            REQUIRE(check_84_int == 84);
+        }
+        {
+            int check_84_int = 0;
+            auto p = pr::promise<>();
+            p.finally([&check_84_int](){
+                check_84_int += 42;
+                throw std::logic_error("hello fail");
+            }).except([&check_84_int](std::exception_ptr e){
+                if ( check_hello_fail_exception(e) ) {
+                    check_84_int += 42;
+                }
+            });
+            p.reject(std::make_exception_ptr(std::logic_error("hello")));
+            REQUIRE(check_84_int == 84);
+        }
+        {
+            int check_84_int = 0;
+            auto p = pr::promise<int>();
+            p.finally([&check_84_int](){
+                check_84_int += 42;
+                throw std::logic_error("hello fail");
+            }).except([&check_84_int](std::exception_ptr e) -> int {
+                if ( check_hello_fail_exception(e) ) {
+                    check_84_int += 42;
+                }
+                return 0;
+            });
+            p.resolve(1);
+            REQUIRE(check_84_int == 84);
+        }
+        {
+            int check_84_int = 0;
+            auto p = pr::promise<int>();
+            p.finally([&check_84_int](){
+                check_84_int += 42;
+                throw std::logic_error("hello fail");
+            }).except([&check_84_int](std::exception_ptr e) -> int {
+                if ( check_hello_fail_exception(e) ) {
+                    check_84_int += 42;
+                }
+                return 0;
+            });
+            p.reject(std::make_exception_ptr(std::logic_error("hello")));
+            REQUIRE(check_84_int == 84);
+        }
+    }
     SECTION("make_promise") {
         {
             int check_84_int = 0;

@@ -416,6 +416,21 @@ namespace promise_hpp
                 [](auto&& v) { return std::forward<decltype(v)>(v); },
                 std::forward<RejectF>(on_reject));
         }
+
+        //
+        // finally
+        //
+
+        template < typename FinallyF >
+        promise<T> finally(FinallyF&& on_finally) {
+            return then([f = on_finally](auto&& v) {
+                std::invoke(std::move(f));
+                return std::forward<decltype(v)>(v);
+            }, [f = on_finally](std::exception_ptr e) -> T {
+                std::invoke(std::move(f));
+                std::rethrow_exception(e);
+            });
+        }
     private:
         class state;
         std::shared_ptr<state> state_;
@@ -836,6 +851,20 @@ namespace promise_hpp
             return then(
                 [](){},
                 std::forward<RejectF>(on_reject));
+        }
+
+        //
+        // finally
+        //
+
+        template < typename FinallyF >
+        promise<void> finally(FinallyF&& on_finally) {
+            return then([f = on_finally]() {
+                std::invoke(std::move(f));
+            }, [f = on_finally](std::exception_ptr e) {
+                std::invoke(std::move(f));
+                std::rethrow_exception(e);
+            });
         }
     private:
         class state;
