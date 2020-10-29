@@ -42,12 +42,13 @@ target_link_libraries(${PROJECT_NAME} Threads::Threads)
 
 include(FetchContent)
 FetchContent_Declare(
-    catch2
-    GIT_REPOSITORY https://github.com/catchorg/catch2)
+    catchorg_catch2
+    GIT_REPOSITORY https://github.com/catchorg/catch2
+    GIT_TAG v2.13.2)
 
-FetchContent_GetProperties(catch2)
-if(NOT catch2_POPULATED)
-    FetchContent_Populate(catch2)
+FetchContent_GetProperties(catchorg_catch2)
+if(NOT catchorg_catch2_POPULATED)
+    FetchContent_Populate(catchorg_catch2)
     target_include_directories(${PROJECT_NAME}
-        PRIVATE ${catch2_SOURCE_DIR}/single_include)
+        PRIVATE ${catchorg_catch2_SOURCE_DIR}/single_include)
 endif()

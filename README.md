@@ -1,5 +1,7 @@
 # promise.hpp
 
+> C++ asynchronous promises like a Promises/A+
+
 [![travis][badge.travis]][travis]
 [![appveyor][badge.appveyor]][appveyor]
 [![codecov][badge.codecov]][codecov]
@@ -7,9 +9,9 @@
 [![license][badge.license]][license]
 [![paypal][badge.paypal]][paypal]
 
-[badge.travis]: https://img.shields.io/travis/BlackMATov/promise.hpp/master.svg?logo=travis
-[badge.appveyor]: https://img.shields.io/appveyor/ci/BlackMATov/promise-hpp/master.svg?logo=appveyor
-[badge.codecov]: https://img.shields.io/codecov/c/github/BlackMATov/promise.hpp/master.svg?logo=codecov
+[badge.travis]: https://img.shields.io/travis/BlackMATov/promise.hpp/main.svg?logo=travis
+[badge.appveyor]: https://img.shields.io/appveyor/ci/BlackMATov/promise-hpp/main.svg?logo=appveyor
+[badge.codecov]: https://img.shields.io/codecov/c/github/BlackMATov/promise.hpp/main.svg?logo=codecov
 [badge.language]: https://img.shields.io/badge/language-C%2B%2B17-yellow.svg
 [badge.license]: https://img.shields.io/badge/license-MIT-blue.svg
 [badge.paypal]: https://img.shields.io/badge/donate-PayPal-orange.svg?logo=paypal&colorA=00457C
@@ -22,6 +24,12 @@
 [paypal]: https://www.paypal.me/matov
 
 [promise]: https://github.com/BlackMATov/promise.hpp
+
+## Requirements
+
+- [gcc](https://www.gnu.org/software/gcc/) **>= 7**
+- [clang](https://clang.llvm.org/) **>= 5.0**
+- [msvc](https://visualstudio.microsoft.com/) **>= 2017**
 
 ## Installation
 
@@ -189,9 +197,5 @@ download("http://www.google.com")
         // ...
     });
 ```
-
-## API
-
-> coming soon!
 
 ## [License (MIT)](./LICENSE.md)
