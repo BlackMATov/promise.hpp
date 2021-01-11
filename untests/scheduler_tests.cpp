@@ -9,6 +9,9 @@
 
 #include <thread>
 #include <numeric>
+#include <iostream>
+
+#include <cmath>
 #include <cstring>
 
 namespace sd = scheduler_hpp;

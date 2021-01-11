@@ -9,6 +9,9 @@
 
 #include <thread>
 #include <numeric>
+#include <iostream>
+
+#include <cmath>
 #include <cstring>
 
 namespace jb = jobber_hpp;

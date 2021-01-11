@@ -8,6 +8,8 @@
 
 #include "promise.hpp"
 
+#include <algorithm>
+
 namespace scheduler_hpp
 {
     using namespace promise_hpp;
