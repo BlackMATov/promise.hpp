@@ -1,7 +1,7 @@
 /*******************************************************************************
  * This file is part of the "https://github.com/blackmatov/promise.hpp"
  * For conditions of distribution and use, see copyright notice in LICENSE.md
- * Copyright (C) 2018-2019, by Matvey Cherevko (blackmatov@gmail.com)
+ * Copyright (C) 2018-2021, by Matvey Cherevko (blackmatov@gmail.com)
  ******************************************************************************/
 
 #pragma once
@@ -123,7 +123,7 @@ namespace promise_hpp
         std::size_t size() const noexcept {
             return (*state_).size();
         }
-        
+
         std::exception_ptr at(std::size_t index) const {
             return (*state_).at(index);
         }
@@ -886,7 +886,7 @@ namespace promise_hpp
                 std::forward<ResolveF>(on_resolve),
                 std::forward<RejectF>(on_reject),
                 true);
-                
+
             return next;
         }
 
