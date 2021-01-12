@@ -1,18 +1,17 @@
 /*******************************************************************************
  * This file is part of the "https://github.com/blackmatov/promise.hpp"
  * For conditions of distribution and use, see copyright notice in LICENSE.md
- * Copyright (C) 2018-2019, by Matvey Cherevko (blackmatov@gmail.com)
+ * Copyright (C) 2018-2021, by Matvey Cherevko (blackmatov@gmail.com)
  ******************************************************************************/
 
-#define CATCH_CONFIG_FAST_COMPILE
-#include <catch2/catch.hpp>
+#include <promise.hpp/promise.hpp>
+#include "doctest/doctest.h"
 
 #include <array>
 #include <thread>
 #include <numeric>
 #include <cstring>
 
-#include <promise.hpp/promise.hpp>
 namespace pr = promise_hpp;
 
 namespace
@@ -75,7 +74,7 @@ namespace
 }
 
 TEST_CASE("is_promise") {
-    SECTION("positive") {
+    SUBCASE("positive") {
         static_assert(
             pr::is_promise<pr::promise<void>>::value,
             "unit test fail");
@@ -96,7 +95,7 @@ TEST_CASE("is_promise") {
             pr::is_promise<const volatile pr::promise<int>>::value,
             "unit test fail");
     }
-    SECTION("negative") {
+    SUBCASE("negative") {
         static_assert(
             !pr::is_promise<pr::promise<void>&>::value,
             "unit test fail");
@@ -120,7 +119,7 @@ TEST_CASE("is_promise") {
 }
 
 TEST_CASE("is_promise_r") {
-    SECTION("positive") {
+    SUBCASE("positive") {
         static_assert(
             pr::is_promise_r<void, pr::promise<void>>::value,
             "unit test fail");
@@ -131,7 +130,7 @@ TEST_CASE("is_promise_r") {
             pr::is_promise_r<double, const pr::promise<int>>::value,
             "unit test fail");
     }
-    SECTION("negative") {
+    SUBCASE("negative") {
         static_assert(
             !pr::is_promise_r<void, pr::promise<int>>::value,
             "unit test fail");
@@ -148,7 +147,7 @@ TEST_CASE("is_promise_r") {
 }
 
 TEST_CASE("promise") {
-    SECTION("basic") {
+    SUBCASE("basic") {
         {
             auto p1 = pr::promise<int>();
             auto p2 = pr::promise<int>();
@@ -194,7 +193,7 @@ TEST_CASE("promise") {
             REQUIRE_FALSE(p1 == p3);
         }
     }
-    SECTION("resolved") {
+    SUBCASE("resolved") {
         {
             int check_42_int = 0;
             auto p = pr::promise<int>();
@@ -226,7 +225,7 @@ TEST_CASE("promise") {
             REQUIRE(check_100500_transform == 100500);
         }
     }
-    SECTION("resolved_ref") {
+    SUBCASE("resolved_ref") {
         {
             int* check_42_int = nullptr;
             auto p = pr::promise<std::reference_wrapper<int>>();
@@ -250,7 +249,7 @@ TEST_CASE("promise") {
             REQUIRE(*check_42_int == 42);
         }
     }
-    SECTION("rejected") {
+    SUBCASE("rejected") {
         {
             bool call_fail_with_logic_error = false;
             bool not_call_then_on_reject = true;
@@ -300,7 +299,7 @@ TEST_CASE("promise") {
             REQUIRE(check_multi_fail == 2);
         }
     }
-    SECTION("unresolved") {
+    SUBCASE("unresolved") {
         {
             int check_42_int = 0;
             bool not_call_before_resolve = true;
@@ -334,7 +333,7 @@ TEST_CASE("promise") {
             REQUIRE(call_fail_with_logic_error);
         }
     }
-    SECTION("finally") {
+    SUBCASE("finally") {
         {
             bool all_is_ok = false;
             auto p = pr::promise<int>();
@@ -372,7 +371,7 @@ TEST_CASE("promise") {
             REQUIRE(all_is_ok);
         }
     }
-    SECTION("after_finally") {
+    SUBCASE("after_finally") {
         {
             int check_84_int = 0;
             auto p = pr::promise<>();
@@ -400,7 +399,7 @@ TEST_CASE("promise") {
             REQUIRE(check_84_int == 84);
         }
     }
-    SECTION("failed_finally") {
+    SUBCASE("failed_finally") {
         {
             int check_84_int = 0;
             auto p = pr::promise<>();
@@ -460,7 +459,7 @@ TEST_CASE("promise") {
             REQUIRE(check_84_int == 84);
         }
     }
-    SECTION("make_promise") {
+    SUBCASE("make_promise") {
         {
             int check_84_int = 0;
             auto p = pr::make_promise<int>([](auto resolve, auto reject){
@@ -500,7 +499,7 @@ TEST_CASE("promise") {
             REQUIRE(call_fail_with_logic_error);
         }
     }
-    SECTION("make_resolved_promise") {
+    SUBCASE("make_resolved_promise") {
         {
             bool call_check = false;
             pr::make_resolved_promise()
@@ -518,7 +517,7 @@ TEST_CASE("promise") {
             REQUIRE(check_42_int == 42);
         }
     }
-    SECTION("make_rejected_promise") {
+    SUBCASE("make_rejected_promise") {
         {
             bool call_fail_with_logic_error = false;
             pr::make_rejected_promise<int>(std::logic_error("hello fail"))
@@ -537,7 +536,7 @@ TEST_CASE("promise") {
             REQUIRE(call_fail_with_logic_error);
         }
     }
-    SECTION("exceptions") {
+    SUBCASE("exceptions") {
         {
             bool not_call_then_on_reject = true;
             bool call_fail_with_logic_error = false;
@@ -569,7 +568,7 @@ TEST_CASE("promise") {
             REQUIRE(call_fail_with_logic_error);
         }
     }
-    SECTION("multi_then") {
+    SUBCASE("multi_then") {
         {
             auto p = pr::promise<int>();
 
@@ -631,7 +630,7 @@ TEST_CASE("promise") {
             REQUIRE(pb_value == 21);
         }
     }
-    SECTION("chaining") {
+    SUBCASE("chaining") {
         {
             int check_84_int = 0;
             auto p1 = pr::make_resolved_promise(42);
@@ -687,7 +686,7 @@ TEST_CASE("promise") {
             REQUIRE(check_84_int == 84);
         }
     }
-    SECTION("lazy_chaining") {
+    SUBCASE("lazy_chaining") {
         {
             int check_84_int = 0;
             auto p1 = pr::make_promise<int>();
@@ -707,7 +706,7 @@ TEST_CASE("promise") {
             REQUIRE(check_84_int == 84);
         }
     }
-    SECTION("typed_chaining_fails") {
+    SUBCASE("typed_chaining_fails") {
         {
             bool call_fail_with_logic_error = false;
             auto p1 = pr::make_resolved_promise(42);
@@ -773,7 +772,7 @@ TEST_CASE("promise") {
             REQUIRE(call_fail_with_logic_error);
         }
     }
-    SECTION("void_chaining_fails") {
+    SUBCASE("void_chaining_fails") {
         {
             bool call_fail_with_logic_error = false;
             auto p1 = pr::make_resolved_promise();
@@ -831,7 +830,7 @@ TEST_CASE("promise") {
             REQUIRE(call_fail_with_logic_error);
         }
     }
-    SECTION("make_all_promise") {
+    SUBCASE("make_all_promise") {
         {
             bool all_is_ok = false;
             pr::make_all_promise(std::vector<pr::promise<int>>())
@@ -913,7 +912,7 @@ TEST_CASE("promise") {
             });
         }
     }
-    SECTION("make_any_promise") {
+    SUBCASE("make_any_promise") {
         {
             bool all_is_ok = false;
             auto p = pr::make_any_promise(std::vector<pr::promise<int>>{});
@@ -973,7 +972,7 @@ TEST_CASE("promise") {
             REQUIRE(all_is_ok);
         }
     }
-    SECTION("make_race_promise") {
+    SUBCASE("make_race_promise") {
         {
             auto p1 = pr::promise<int>();
             auto p2 = pr::promise<int>();
@@ -1049,7 +1048,7 @@ TEST_CASE("promise") {
             });
         }
     }
-    SECTION("make_tuple_promise") {
+    SUBCASE("make_tuple_promise") {
         {
             static_assert(
                 std::is_same<
@@ -1131,7 +1130,7 @@ TEST_CASE("promise") {
             });
         }
     }
-    SECTION("make_all_promise_fail") {
+    SUBCASE("make_all_promise_fail") {
         {
             bool call_fail_with_logic_error = false;
             bool not_call_then_on_reject = true;
@@ -1169,7 +1168,7 @@ TEST_CASE("promise") {
             REQUIRE(call_except_count == 1);
         }
     }
-    SECTION("make_race_promise_fail") {
+    SUBCASE("make_race_promise_fail") {
         {
             bool call_fail_with_logic_error = false;
             bool not_call_then_on_reject = true;
@@ -1186,7 +1185,7 @@ TEST_CASE("promise") {
             REQUIRE(call_fail_with_logic_error);
         }
     }
-    SECTION("make_tuple_promise_fail") {
+    SUBCASE("make_tuple_promise_fail") {
         {
             auto p1 = pr::promise<int>();
             auto p2 = pr::make_tuple_promise(std::make_tuple(p1));
@@ -1224,7 +1223,7 @@ TEST_CASE("promise") {
             REQUIRE_THROWS_AS(p3.get(), std::logic_error);
         }
     }
-    SECTION("then_all") {
+    SUBCASE("then_all") {
         {
             int check_42_int = 0;
             pr::make_resolved_promise()
@@ -1257,7 +1256,7 @@ TEST_CASE("promise") {
             REQUIRE(check_42_int2 == 42);
         }
     }
-    SECTION("then_race") {
+    SUBCASE("then_race") {
         {
             int check_42_int = 0;
             pr::make_resolved_promise()
@@ -1302,7 +1301,7 @@ TEST_CASE("promise") {
             REQUIRE(call_then_only_once == 1);
         }
     }
-    SECTION("then_tuple") {
+    SUBCASE("then_tuple") {
         {
             float check_42_float = 0.f;
             pr::make_resolved_promise()
@@ -1313,7 +1312,7 @@ TEST_CASE("promise") {
             }).then([&check_42_float](const std::tuple<int, float>& t){
                 check_42_float = std::get<0>(t) + std::get<1>(t);
             });
-            REQUIRE(check_42_float == Approx(42.f).margin(0.01f));
+            REQUIRE(check_42_float == doctest::Approx(42.f).epsilon(0.01f));
         }
         {
             float check_42_float = 0.f;
@@ -1325,7 +1324,7 @@ TEST_CASE("promise") {
             }).then([&check_42_float](const std::tuple<int, float>& t){
                 check_42_float = std::get<0>(t) + std::get<1>(t);
             });
-            REQUIRE(check_42_float == Approx(42.f).margin(0.01f));
+            REQUIRE(check_42_float == doctest::Approx(42.f).epsilon(0.01f));
         }
         {
             bool call_fail_with_logic_error = false;
@@ -1344,7 +1343,7 @@ TEST_CASE("promise") {
 }
 
 TEST_CASE("get_and_wait") {
-    SECTION("get_void_promises") {
+    SUBCASE("get_void_promises") {
         {
             auto p = pr::make_resolved_promise();
             REQUIRE_NOTHROW(p.get());
@@ -1416,7 +1415,7 @@ TEST_CASE("get_and_wait") {
                 == pr::promise_wait_status::no_timeout);
         }
     }
-    SECTION("get_typed_promises") {
+    SUBCASE("get_typed_promises") {
         {
             auto p = pr::make_resolved_promise(42);
             REQUIRE(p.get() == 42);
@@ -1471,7 +1470,7 @@ TEST_CASE("get_and_wait") {
             REQUIRE(p.get() == 42);
         }
     }
-    SECTION("get_or_default") {
+    SUBCASE("get_or_default") {
         {
             auto p = pr::make_resolved_promise(42);
             REQUIRE(p.get_or_default(84) == 42);
@@ -1548,7 +1547,7 @@ TEST_CASE("promise_transformations") {
             std::is_same<decltype(p_d)::value_type, double>::value,
             "unit test fail");
     }
-    SECTION("after_except") {
+    SUBCASE("after_except") {
         {
             auto p_v = pr::promise<int>()
                 .then([](int)->int{

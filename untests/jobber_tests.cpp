@@ -1,17 +1,19 @@
 /*******************************************************************************
  * This file is part of the "https://github.com/blackmatov/promise.hpp"
  * For conditions of distribution and use, see copyright notice in LICENSE.md
- * Copyright (C) 2018-2019, by Matvey Cherevko (blackmatov@gmail.com)
+ * Copyright (C) 2018-2021, by Matvey Cherevko (blackmatov@gmail.com)
  ******************************************************************************/
 
-#define CATCH_CONFIG_FAST_COMPILE
-#include <catch2/catch.hpp>
+#include <promise.hpp/jobber.hpp>
+#include "doctest/doctest.h"
 
 #include <thread>
 #include <numeric>
+#include <iostream>
+
+#include <cmath>
 #include <cstring>
 
-#include <promise.hpp/jobber.hpp>
 namespace jb = jobber_hpp;
 
 TEST_CASE("jobber") {
@@ -66,8 +68,8 @@ TEST_CASE("jobber") {
         auto p1 = j.async([](float angle){
             return std::cos(angle);
         }, pi * 2);
-        REQUIRE(p0.get() == Approx(0.f).margin(0.01f));
-        REQUIRE(p1.get() == Approx(1.f).margin(0.01f));
+        REQUIRE(p0.get() == doctest::Approx(0.f).epsilon(0.01f));
+        REQUIRE(p1.get() == doctest::Approx(1.f).epsilon(0.01f));
     }
     {
         jb::jobber j(1);
@@ -324,6 +326,6 @@ TEST_CASE("jobber") {
         for ( std::size_t i = 0; i < 50; ++i ) {
             r1 += std::sin(static_cast<float>(i));
         }
-        REQUIRE(r0 == Approx(r1 * 50.f).margin(0.01f));
+        REQUIRE(r0 == doctest::Approx(r1 * 50.f).epsilon(0.01f));
     }
 }
