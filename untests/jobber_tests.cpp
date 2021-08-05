@@ -60,16 +60,16 @@ TEST_CASE("jobber") {
         REQUIRE(v5 == 4);
     }
     {
-        const float pi = 3.14159265358979323846264338327950288f;
+        const double pi = 3.14159265358979323846264338327950288;
         jb::jobber j(1);
-        auto p0 = j.async([](float angle){
+        auto p0 = j.async([](double angle){
             return std::sin(angle);
         }, pi);
-        auto p1 = j.async([](float angle){
+        auto p1 = j.async([](double angle){
             return std::cos(angle);
         }, pi * 2);
-        REQUIRE(p0.get() == doctest::Approx(0.f).epsilon(0.01f));
-        REQUIRE(p1.get() == doctest::Approx(1.f).epsilon(0.01f));
+        REQUIRE(p0.get() == doctest::Approx(0.0).epsilon(0.01));
+        REQUIRE(p1.get() == doctest::Approx(1.0).epsilon(0.01));
     }
     {
         jb::jobber j(1);
@@ -303,29 +303,29 @@ TEST_CASE("jobber") {
         jb::jobber j(2);
         jb::jobber g(2);
 
-        std::vector<jb::promise<float>> jp(50);
+        std::vector<jb::promise<double>> jp(50);
         for ( auto& jpi : jp ) {
             jpi = j.async([&g](){
-                std::vector<jb::promise<float>> gp(50);
+                std::vector<jb::promise<double>> gp(50);
                 for ( std::size_t i = 0; i < gp.size(); ++i ) {
-                    gp[i] = g.async([](float angle){
+                    gp[i] = g.async([](double angle){
                         return std::sin(angle);
-                    }, static_cast<float>(i));
+                    }, static_cast<double>(i));
                 }
-                return std::accumulate(gp.begin(), gp.end(), 0.f,
-                    [](float r, jb::promise<float>& f){
+                return std::accumulate(gp.begin(), gp.end(), 0.0,
+                    [](double r, jb::promise<double>& f){
                         return r + f.get();
                     });
             });
         }
-        float r0 = std::accumulate(jp.begin(), jp.end(), 0.f,
-            [](float r, jb::promise<float>& f){
+        double r0 = std::accumulate(jp.begin(), jp.end(), 0.0,
+            [](double r, jb::promise<double>& f){
                 return r + f.get();
             });
-        float r1 = 0.f;
+        double r1 = 0.0;
         for ( std::size_t i = 0; i < 50; ++i ) {
-            r1 += std::sin(static_cast<float>(i));
+            r1 += std::sin(static_cast<double>(i));
         }
-        REQUIRE(r0 == doctest::Approx(r1 * 50.f).epsilon(0.01f));
+        REQUIRE(r0 == doctest::Approx(r1 * 50.0).epsilon(0.01));
     }
 }

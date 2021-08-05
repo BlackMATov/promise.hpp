@@ -1303,28 +1303,28 @@ TEST_CASE("promise") {
     }
     SUBCASE("then_tuple") {
         {
-            float check_42_float = 0.f;
+            double check_42_double = 0.0;
             pr::make_resolved_promise()
             .then_tuple([](){
                 return std::make_tuple(
                     pr::make_resolved_promise(32),
-                    pr::make_resolved_promise(10.f));
-            }).then([&check_42_float](const std::tuple<int, float>& t){
-                check_42_float = std::get<0>(t) + std::get<1>(t);
+                    pr::make_resolved_promise(10.0));
+            }).then([&check_42_double](const std::tuple<int, double>& t){
+                check_42_double = std::get<0>(t) + std::get<1>(t);
             });
-            REQUIRE(check_42_float == doctest::Approx(42.f).epsilon(0.01f));
+            REQUIRE(check_42_double == doctest::Approx(42.0).epsilon(0.01));
         }
         {
-            float check_42_float = 0.f;
+            double check_42_double = 0.0;
             pr::make_resolved_promise(42)
             .then_tuple([](int){
                 return std::make_tuple(
                     pr::make_resolved_promise(32),
-                    pr::make_resolved_promise(10.f));
-            }).then([&check_42_float](const std::tuple<int, float>& t){
-                check_42_float = std::get<0>(t) + std::get<1>(t);
+                    pr::make_resolved_promise(10.0));
+            }).then([&check_42_double](const std::tuple<int, double>& t){
+                check_42_double = static_cast<double>(std::get<0>(t)) + std::get<1>(t);
             });
-            REQUIRE(check_42_float == doctest::Approx(42.f).epsilon(0.01f));
+            REQUIRE(check_42_double == doctest::Approx(42.0).epsilon(0.01));
         }
         {
             bool call_fail_with_logic_error = false;
