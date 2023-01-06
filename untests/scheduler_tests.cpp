@@ -4,8 +4,8 @@
  * Copyright (C) 2018-2023, by Matvey Cherevko (blackmatov@gmail.com)
  ******************************************************************************/
 
-#include <promise.hpp/scheduler.hpp>
-#include "doctest/doctest.h"
+#include <promise.hpp/bonus/scheduler.hpp>
+#include <doctest/doctest.h>
 
 #include <thread>
 #include <numeric>
