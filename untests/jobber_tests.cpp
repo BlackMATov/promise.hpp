@@ -1,11 +1,11 @@
 /*******************************************************************************
  * This file is part of the "https://github.com/blackmatov/promise.hpp"
  * For conditions of distribution and use, see copyright notice in LICENSE.md
- * Copyright (C) 2018-2021, by Matvey Cherevko (blackmatov@gmail.com)
+ * Copyright (C) 2018-2023, by Matvey Cherevko (blackmatov@gmail.com)
  ******************************************************************************/
 
-#include <promise.hpp/jobber.hpp>
-#include "doctest/doctest.h"
+#include <promise.hpp/bonus/jobber.hpp>
+#include <doctest/doctest.h>
 
 #include <thread>
 #include <numeric>
